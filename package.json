@@ -1,0 +1,37 @@
+{
+  "name": "alertx",
+  "version": "1.0.0",
+  "description": "Smart Ambulance Dispatch & Hospital Coordination System",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "backend": "npm run start --workspace=backend",
+    "user-app": "npm run start --workspace=user-app",
+    "driver-app": "npm run start --workspace=driver-app",
+    "dashboard": "npm run start --workspace=dashboard",
+    "ai-service": "npm run start --workspace=ai-service",
+    "install-all": "npm install",
+    "clean": "npm run clean --workspaces --if-present"
+  },
+  "keywords": [
+    "ambulance",
+    "dispatch",
+    "hospital",
+    "emergency",
+    "react-native",
+    "react",
+    "nodejs",
+    "mongodb"
+  ],
+  "authors": [
+    "BSCS Final Year Students"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}
