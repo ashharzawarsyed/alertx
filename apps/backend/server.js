@@ -2,16 +2,14 @@ import express from "express";
 import cors from "cors";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
-import dotenv from "dotenv";
+import "dotenv/config";
 
 import connectDB from "./config/db.js";
 import { errorHandler, notFound } from "./middlewares/errorHandler.js";
 import apiRoutes from "./routes/index.js";
 
-// Load environment variables
-dotenv.config();
-
 const app = express();
+
 const PORT = process.env.PORT || 5000;
 
 // Connect to MongoDB

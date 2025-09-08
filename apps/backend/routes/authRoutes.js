@@ -12,6 +12,10 @@ import {
 import {
   validateUserRegistration,
   validateUserLogin,
+  validateChangePassword,
+  validateForgotPassword,
+  validateResetPassword,
+  validateUpdateProfile,
 } from "../middlewares/validation.js";
 import { authenticate } from "../middlewares/auth.js";
 
@@ -50,27 +54,27 @@ router.get("/profile", authenticate, getMe);
  * @desc    Update user profile
  * @access  Private
  */
-router.put("/profile", authenticate, updateProfile);
+router.put("/profile", authenticate, validateUpdateProfile, updateProfile);
 
 /**
  * @route   PUT /api/v1/auth/change-password
  * @desc    Change password
  * @access  Private
  */
-router.put("/change-password", authenticate, changePassword);
+router.put("/change-password", authenticate, validateChangePassword, changePassword);
 
 /**
  * @route   POST /api/v1/auth/forgot-password
  * @desc    Send password reset email
  * @access  Public
  */
-router.post("/forgot-password", forgotPassword);
+router.post("/forgot-password", validateForgotPassword, forgotPassword);
 
 /**
  * @route   POST /api/v1/auth/reset-password
  * @desc    Reset password with token
  * @access  Public
  */
-router.post("/reset-password", resetPassword);
+router.post("/reset-password", validateResetPassword, resetPassword);
 
 export default router;

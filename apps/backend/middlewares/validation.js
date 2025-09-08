@@ -48,6 +48,34 @@ export const validateUserRegistration = [
 
   body("role").isIn(Object.values(USER_ROLES)).withMessage("Invalid user role"),
 
+  // Conditional validation for patient location
+  body("location.lat")
+    .if(body("role").equals(USER_ROLES.PATIENT))
+    .isFloat({ min: -90, max: 90 })
+    .withMessage("Valid latitude is required for patients"),
+
+  body("location.lng")
+    .if(body("role").equals(USER_ROLES.PATIENT))
+    .isFloat({ min: -180, max: 180 })
+    .withMessage("Valid longitude is required for patients"),
+
+  // Conditional validation for driver info
+  body("driverInfo.licenseNumber")
+    .if(body("role").equals(USER_ROLES.DRIVER))
+    .notEmpty()
+    .withMessage("License number is required for drivers"),
+
+  body("driverInfo.ambulanceNumber")
+    .if(body("role").equals(USER_ROLES.DRIVER))
+    .notEmpty()
+    .withMessage("Ambulance number is required for drivers"),
+
+  // Conditional validation for hospital staff
+  body("hospitalInfo.hospitalId")
+    .if(body("role").equals(USER_ROLES.HOSPITAL_STAFF))
+    .isMongoId()
+    .withMessage("Valid hospital ID is required for hospital staff"),
+
   handleValidationErrors,
 ];
 
@@ -157,6 +185,84 @@ export const validatePagination = [
     .optional()
     .isInt({ min: 1, max: 100 })
     .withMessage("Limit must be between 1 and 100"),
+
+  handleValidationErrors,
+];
+
+/**
+ * Change password validation
+ */
+export const validateChangePassword = [
+  body("currentPassword")
+    .notEmpty()
+    .withMessage("Current password is required"),
+
+  body("newPassword")
+    .isLength({ min: 8 })
+    .withMessage("New password must be at least 8 characters long")
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage(
+      "New password must contain at least one uppercase letter, one lowercase letter, and one number"
+    ),
+
+  handleValidationErrors,
+];
+
+/**
+ * Forgot password validation
+ */
+export const validateForgotPassword = [
+  body("email")
+    .isEmail()
+    .normalizeEmail()
+    .withMessage("Please provide a valid email"),
+
+  handleValidationErrors,
+];
+
+/**
+ * Reset password validation
+ */
+export const validateResetPassword = [
+  body("token")
+    .notEmpty()
+    .withMessage("Reset token is required"),
+
+  body("password")
+    .isLength({ min: 8 })
+    .withMessage("Password must be at least 8 characters long")
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage(
+      "Password must contain at least one uppercase letter, one lowercase letter, and one number"
+    ),
+
+  handleValidationErrors,
+];
+
+/**
+ * Update profile validation
+ */
+export const validateUpdateProfile = [
+  body("name")
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage("Name must be between 2 and 50 characters"),
+
+  body("phone")
+    .optional()
+    .matches(/^\+[1-9]\d{1,14}$/)
+    .withMessage("Please provide a valid phone number with country code"),
+
+  body("location.lat")
+    .optional()
+    .isFloat({ min: -90, max: 90 })
+    .withMessage("Invalid latitude"),
+
+  body("location.lng")
+    .optional()
+    .isFloat({ min: -180, max: 180 })
+    .withMessage("Invalid longitude"),
 
   handleValidationErrors,
 ];
