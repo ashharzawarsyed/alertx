@@ -1,0 +1,25 @@
+{
+  "name": "alertx-ai-service",
+  "version": "1.0.0",
+  "description": "AI Triage Service for AlertX Emergency Management",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test-triage.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1"
+  },
+  "keywords": [
+    "ai",
+    "triage",
+    "emergency",
+    "medical"
+  ],
+  "author": "AlertX Team",
+  "license": "MIT"
+}
