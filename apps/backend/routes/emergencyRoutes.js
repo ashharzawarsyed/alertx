@@ -1,6 +1,7 @@
 import express from "express";
 import {
   createEmergency,
+  emergencyButton,
   getEmergencies,
   getEmergency,
   acceptEmergency,
@@ -27,6 +28,18 @@ router.post(
   authorize(USER_ROLES.PATIENT),
   validateEmergencyRequest,
   createEmergency
+);
+
+/**
+ * @route   POST /api/v1/emergencies/emergency-button
+ * @desc    Emergency button - Create critical emergency
+ * @access  Private (Patients only)
+ */
+router.post(
+  "/emergency-button",
+  authenticate,
+  authorize(USER_ROLES.PATIENT),
+  emergencyButton
 );
 
 /**

@@ -1,18 +1,22 @@
 import express from "express";
 import authRoutes from "./authRoutes.js";
+import medicalProfileRoutes from "./medicalProfileRoutes.js";
 import emergencyRoutes from "./emergencyRoutes.js";
 import hospitalRoutes from "./hospitalRoutes.js";
 import userRoutes from "./userRoutes.js";
 import tripRoutes from "./tripRoutes.js";
+import debugRoutes from "./debugRoutes.js";
 
 const router = express.Router();
 
 // API Routes
 router.use("/auth", authRoutes);
+router.use("/medical-profile", medicalProfileRoutes);
 router.use("/emergencies", emergencyRoutes);
 router.use("/hospitals", hospitalRoutes);
 router.use("/users", userRoutes);
 router.use("/trips", tripRoutes);
+router.use("/debug", debugRoutes);
 
 // API Info
 router.get("/", (req, res) => {
@@ -22,6 +26,7 @@ router.get("/", (req, res) => {
     version: "1.0.0",
     endpoints: {
       auth: "/api/v1/auth",
+      "medical-profile": "/api/v1/medical-profile",
       emergencies: "/api/v1/emergencies",
       hospitals: "/api/v1/hospitals",
       users: "/api/v1/users",

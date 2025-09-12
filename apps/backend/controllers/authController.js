@@ -16,8 +16,6 @@ import { RESPONSE_CODES, USER_ROLES } from "../utils/constants.js";
 export const register = asyncHandler(async (req, res) => {
   const { name, email, phone, password, role, location, notifiers } = req.body;
 
-  console.log('Registration request body:', JSON.stringify(req.body, null, 2));
-
   // Check if user already exists
   const existingUser = await User.findOne({
     $or: [{ email }, { phone }],
@@ -44,6 +42,12 @@ export const register = asyncHandler(async (req, res) => {
   if (role === USER_ROLES.PATIENT && location) {
     userData.location = location;
     if (notifiers) userData.notifiers = notifiers;
+
+    // Handle medical profile data if provided
+    const { medicalProfile } = req.body;
+    if (medicalProfile) {
+      userData.medicalProfile = medicalProfile;
+    }
   }
 
   if (role === USER_ROLES.DRIVER) {

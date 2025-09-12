@@ -4,6 +4,7 @@ import Hospital from "../models/Hospital.js";
 import Trip from "../models/Trip.js";
 import { asyncHandler } from "../middlewares/errorHandler.js";
 import { sendResponse, calculateDistance } from "../utils/helpers.js";
+import aiTriageService from "../services/aiTriageService.js";
 import {
   RESPONSE_CODES,
   EMERGENCY_STATUS,
@@ -19,14 +20,220 @@ import {
  * @access  Private (Patient)
  */
 export const createEmergency = asyncHandler(async (req, res) => {
-  const { symptoms, description, location } = req.body;
+  try {
+    console.log(
+      "🚨 createEmergency called with body:",
+      JSON.stringify(req.body, null, 2)
+    );
+
+    const { symptoms, description, location } = req.body;
+
+    // Verify user is a patient
+    if (req.user.role !== USER_ROLES.PATIENT) {
+      console.log("❌ User role check failed:", req.user.role);
+      return sendResponse(
+        res,
+        RESPONSE_CODES.FORBIDDEN,
+        "Only patients can create emergency requests"
+      );
+    }
+
+    // Check if patient has any active emergency
+    const activeEmergency = await Emergency.findOne({
+      patient: req.user.id,
+      status: {
+        $in: [
+          EMERGENCY_STATUS.PENDING,
+          EMERGENCY_STATUS.ACCEPTED,
+          EMERGENCY_STATUS.IN_PROGRESS,
+        ],
+      },
+    });
+
+    if (activeEmergency) {
+      return sendResponse(
+        res,
+        RESPONSE_CODES.CONFLICT,
+        "You already have an active emergency request"
+      );
+    }
+
+    // Get patient's medical profile for AI analysis context
+    console.log("📋 Getting patient medical profile...");
+    const patient = await User.findById(req.user.id);
+    const patientInfo = {
+      age: patient.medicalProfile?.basicInfo?.age,
+      chronicConditions: patient.medicalProfile?.conditions?.chronic || [],
+      allergies: patient.medicalProfile?.allergies || [],
+      medications: patient.medicalProfile?.medications?.current || [],
+    };
+    console.log("👤 Patient info prepared:", patientInfo);
+
+    // Analyze symptoms with AI service
+    console.log("🚨 Emergency request received, analyzing symptoms...");
+    // Convert symptoms array to string for AI analysis
+    const symptomsText = Array.isArray(symptoms)
+      ? symptoms.join(", ")
+      : symptoms;
+
+    let analysis;
+    let aiResult;
+
+    try {
+      aiResult = await aiTriageService.analyzeSymptoms(
+        symptomsText,
+        patientInfo
+      );
+
+      if (!aiResult.success || !aiResult.analysis) {
+        console.error("❌ AI analysis failed, using fallback classification");
+        analysis = {
+          severity: SEVERITY_LEVELS.MEDIUM,
+          confidence: 60,
+          detectedSymptoms: [symptomsText],
+          recommendations: ["Seek medical attention"],
+          analysisDetails: {
+            source: "fallback",
+            note: "AI service unavailable",
+          },
+        };
+      } else {
+        // The AI service returns nested analysis: aiResult.analysis.analysis
+        analysis = aiResult.analysis.analysis || aiResult.analysis;
+        console.log(
+          "✅ AI analysis successful:",
+          analysis.severity,
+          `(${analysis.confidence}%)`
+        );
+      }
+    } catch (error) {
+      console.error("❌ AI service error:", error.message);
+      // Fallback analysis when AI service fails
+      analysis = {
+        severity: SEVERITY_LEVELS.MEDIUM,
+        confidence: 50,
+        detectedSymptoms: [symptomsText],
+        recommendations: ["Seek medical attention"],
+        analysisDetails: {
+          source: "fallback",
+          error: error.message,
+        },
+      };
+    }
+
+    const priority = aiTriageService.calculatePriority(
+      analysis.severity,
+      patientInfo
+    );
+
+    // Ensure valid numeric values for database
+    const triageScore =
+      analysis.confidence && !isNaN(analysis.confidence)
+        ? Math.round((analysis.confidence / 100) * 10)
+        : 5; // Default to medium score if confidence is invalid
+
+    const aiConfidence =
+      analysis.confidence && !isNaN(analysis.confidence)
+        ? analysis.confidence / 100
+        : 0.5; // Default to 50% confidence
+
+    // Create emergency record with AI analysis
+    const emergency = await Emergency.create({
+      patient: req.user.id,
+      symptoms: symptoms, // Keep as array as expected by the model
+      description,
+      location,
+      status: EMERGENCY_STATUS.PENDING,
+      severityLevel: analysis.severity || SEVERITY_LEVELS.MEDIUM,
+      triageScore: triageScore,
+      aiPrediction: {
+        confidence: aiConfidence,
+        suggestedSpecialty: analysis.suggestedSpecialty || "Emergency Medicine",
+        estimatedTime: analysis.estimatedTime || 30, // Default 30 minutes
+      },
+    });
+
+    // Store detailed AI analysis in notes for reference
+    try {
+      const detectedSymptoms = analysis.detectedSymptoms || [];
+      const recommendations = analysis.recommendations || [
+        "Seek medical attention",
+      ];
+
+      const noteText = `AI Analysis - Detected: ${
+        Array.isArray(detectedSymptoms)
+          ? detectedSymptoms.join(", ")
+          : detectedSymptoms
+      }. Recommendations: ${
+        Array.isArray(recommendations)
+          ? recommendations.join("; ")
+          : recommendations
+      }`;
+
+      await emergency.addNote(noteText, req.user.id);
+    } catch (noteError) {
+      console.error("❌ Failed to add AI analysis note:", noteError.message);
+      // Don't fail the entire request if note fails
+    }
+
+    console.log(
+      `✅ Emergency created with ${analysis.severity} severity (confidence: ${analysis.confidence}%)`
+    );
+
+    // TODO: Start ambulance dispatch process based on severity
+    // if (analysis.severity === SEVERITY_LEVELS.CRITICAL) {
+    //   await dispatchCriticalEmergency(emergency);
+    // }
+
+    // TODO: Notify emergency contacts based on severity
+    // await notifyEmergencyContacts(emergency, analysis.severity);
+
+    await emergency.populate("patient", "name phone location");
+
+    sendResponse(
+      res,
+      RESPONSE_CODES.CREATED,
+      "Emergency request created and analyzed successfully",
+      {
+        emergency,
+        aiAnalysis: {
+          severity: analysis.severity,
+          confidence: analysis.confidence,
+          priority,
+          detectedSymptoms: analysis.detectedSymptoms,
+          recommendations: analysis.recommendations,
+        },
+      }
+    );
+  } catch (error) {
+    console.error("❌ Critical error in createEmergency:", error);
+    console.error("Error stack:", error.stack);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error during emergency creation",
+      error:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : "Something went wrong",
+    });
+  }
+});
+
+/**
+ * @desc    Emergency button - Create critical emergency without AI analysis
+ * @route   POST /api/v1/emergencies/emergency-button
+ * @access  Private (Patient)
+ */
+export const emergencyButton = asyncHandler(async (req, res) => {
+  const { location, notes } = req.body;
 
   // Verify user is a patient
   if (req.user.role !== USER_ROLES.PATIENT) {
     return sendResponse(
       res,
       RESPONSE_CODES.FORBIDDEN,
-      "Only patients can create emergency requests"
+      "Only patients can trigger emergency button"
     );
   }
 
@@ -50,36 +257,52 @@ export const createEmergency = asyncHandler(async (req, res) => {
     );
   }
 
-  // Create emergency
+  console.log("🆘 EMERGENCY BUTTON ACTIVATED for user:", req.user.id);
+
+  // Create critical emergency immediately without AI analysis
   const emergency = await Emergency.create({
     patient: req.user.id,
-    symptoms,
-    description,
+    symptoms: ["Emergency button activated"],
+    description:
+      notes || "Emergency button pressed - immediate assistance required",
     location,
     status: EMERGENCY_STATUS.PENDING,
+    severityLevel: SEVERITY_LEVELS.CRITICAL,
+    triageScore: 10, // Maximum urgency
+    aiPrediction: {
+      confidence: 1.0,
+      suggestedSpecialty: "Emergency Medicine",
+      estimatedTime: 5, // 5 minutes for critical emergency
+    },
   });
 
-  // TODO: Integrate with AI service for triage
-  // For now, assign medium severity as default
-  emergency.severityLevel = SEVERITY_LEVELS.MEDIUM;
-  emergency.triageScore = 5;
+  // Add emergency button note
+  await emergency.addNote(
+    "EMERGENCY BUTTON ACTIVATED - Immediate critical response required",
+    req.user.id
+  );
 
-  await emergency.save();
+  console.log("🚨 Critical emergency created via emergency button");
 
-  // TODO: Start ambulance dispatch process
-  // findAndDispatchAmbulance(emergency);
+  // TODO: Immediately dispatch nearest ambulance
+  // await dispatchCriticalEmergency(emergency);
 
-  // TODO: Notify emergency contacts
-  // notifyEmergencyContacts(emergency);
+  // TODO: Notify all emergency contacts immediately
+  // await notifyAllEmergencyContacts(emergency);
+
+  // TODO: Alert emergency services
+  // await alertEmergencyServices(emergency);
 
   await emergency.populate("patient", "name phone location");
 
   sendResponse(
     res,
     RESPONSE_CODES.CREATED,
-    "Emergency request created successfully",
+    "Emergency alert sent - help is on the way",
     {
       emergency,
+      message: "Critical emergency response initiated",
+      estimatedResponse: "5-10 minutes",
     }
   );
 });

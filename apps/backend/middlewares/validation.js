@@ -224,9 +224,7 @@ export const validateForgotPassword = [
  * Reset password validation
  */
 export const validateResetPassword = [
-  body("token")
-    .notEmpty()
-    .withMessage("Reset token is required"),
+  body("token").notEmpty().withMessage("Reset token is required"),
 
   body("password")
     .isLength({ min: 8 })

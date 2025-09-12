@@ -61,7 +61,12 @@ router.put("/profile", authenticate, validateUpdateProfile, updateProfile);
  * @desc    Change password
  * @access  Private
  */
-router.put("/change-password", authenticate, validateChangePassword, changePassword);
+router.put(
+  "/change-password",
+  authenticate,
+  validateChangePassword,
+  changePassword
+);
 
 /**
  * @route   POST /api/v1/auth/forgot-password
