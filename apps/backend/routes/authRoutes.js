@@ -83,3 +83,10 @@ router.post("/forgot-password", validateForgotPassword, forgotPassword);
 router.post("/reset-password", validateResetPassword, resetPassword);
 
 export default router;
+
+router.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "AlertX API v1 AuthRoutes is Opened",
+  });
+});
