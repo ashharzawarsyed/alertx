@@ -3,7 +3,7 @@ async function testHealthCheck() {
   try {
     console.log("🔍 Testing health endpoint...");
 
-    const response = await fetch("http://localhost:5001/");
+    const response = await fetch("http://localhost:5000/health");
     console.log("Health check status:", response.status);
 
     if (response.ok) {

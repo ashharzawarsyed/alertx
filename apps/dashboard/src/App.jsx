@@ -1,8 +1,15 @@
 import React from "react";
-import { BrowserRouter as Router } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AuthProvider } from "./contexts/AuthContext";
-import BackendTest from "./components/BackendTest";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { LoginPage } from "./features/auth";
+import DashboardLayout from "./shared/layouts/DashboardLayout";
+import AdminDashboard from "./pages/AdminDashboard";
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -14,51 +21,52 @@ const queryClient = new QueryClient({
   },
 });
 
+// Protected Route Component
+const ProtectedRoute = ({ children }) => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-teal-50">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+          <p className="font-sans font-medium text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return isAuthenticated ? children : <Navigate to="/login" replace />;
+};
+
+// Dashboard component with new layout
+const Dashboard = () => {
+  const { user } = useAuth();
+
+  return (
+    <DashboardLayout user={user}>
+      <AdminDashboard />
+    </DashboardLayout>
+  );
+};
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
         <AuthProvider>
-          <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-            <div className="flex min-h-screen items-center justify-center">
-              <div className="mx-4 w-full max-w-md rounded-lg bg-white p-8 shadow-lg">
-                <div className="text-center">
-                  <div className="mb-4">
-                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-500">
-                      <span className="text-2xl font-bold text-white">🚨</span>
-                    </div>
-                  </div>
-                  <h1 className="mb-2 text-3xl font-bold text-gray-900">
-                    AlertX Dashboard
-                  </h1>
-                  <p className="mb-6 text-gray-600">
-                    Emergency Management System
-                  </p>
-                  <div className="space-y-3">
-                    <div className="rounded border border-green-400 bg-green-100 px-4 py-3 text-green-700">
-                      ✅ React Query: Ready
-                    </div>
-                    <div className="rounded border border-green-400 bg-green-100 px-4 py-3 text-green-700">
-                      ✅ TailwindCSS: Ready
-                    </div>
-                    <div className="rounded border border-green-400 bg-green-100 px-4 py-3 text-green-700">
-                      ✅ React Router: Ready
-                    </div>
-                    <div className="rounded border border-green-400 bg-green-100 px-4 py-3 text-green-700">
-                      ✅ Auth Context: Ready
-                    </div>
-                    <div className="rounded border border-green-400 bg-green-100 px-4 py-3 text-green-700">
-                      ✅ React 19.0.0: Fixed
-                    </div>
-                    <BackendTest />
-                  </div>
-                  <p className="mt-6 text-sm text-gray-500">
-                    Phase 1: Dependencies & Version Conflicts Resolved
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
         </AuthProvider>
       </Router>
     </QueryClientProvider>

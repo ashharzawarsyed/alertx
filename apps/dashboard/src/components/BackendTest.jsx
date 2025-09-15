@@ -8,7 +8,7 @@ function BackendTest() {
   useEffect(() => {
     const testBackendConnection = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/", {
+        const response = await axios.get("http://localhost:5000/health", {
           timeout: 5000,
         });
         setBackendStatus("connected");
