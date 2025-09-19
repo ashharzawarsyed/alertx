@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
@@ -10,6 +11,7 @@ import {
   Shield,
   CheckCircle,
   AlertCircle,
+  Phone,
 } from "lucide-react";
 import {
   InputField,
@@ -41,13 +43,16 @@ const registerSchema = yup.object({
     .string()
     .email("Please enter a valid email")
     .required("Email is required"),
+  phone: yup
+    .string()
+    .matches(
+      /^\+[1-9]\d{1,14}$/,
+      "Please provide a valid phone number with country code (e.g., +1234567890)",
+    )
+    .required("Phone number is required"),
   password: yup
     .string()
     .min(8, "Password must be at least 8 characters")
-    .matches(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
-      "Password must contain uppercase, lowercase, number and special character",
-    )
     .required("Password is required"),
   confirmPassword: yup
     .string()
@@ -56,40 +61,92 @@ const registerSchema = yup.object({
 });
 
 const LoginForm = () => {
+  console.log("[LoginForm] Component rendered");
   const [isLogin, setIsLogin] = useState(true);
+
+  // Debug: Log all submit events on the page
+  useEffect(() => {
+    const handler = (e) => {
+      console.log("[Global Submit Event]", e.target);
+    };
+    window.addEventListener("submit", handler, true);
+    return () => window.removeEventListener("submit", handler, true);
+  }, []);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState(null);
-  const { login, register: registerUser } = useAuth();
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-  } = useForm({
-    resolver: yupResolver(isLogin ? loginSchema : registerSchema),
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
   });
+  const { login, register: registerUser } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const onSubmit = async (data) => {
+  // Handle form field changes
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // Clear form when switching modes
+  useEffect(() => {
+    setFormData({
+      name: "",
+      email: "",
+      phone: "",
+      password: "",
+      confirmPassword: "",
+    });
+    setMessage(null);
+  }, [isLogin]);
+
+  const onSubmit = async (e) => {
+    console.log("[LoginForm] onSubmit called", e);
+    if (e && typeof e.preventDefault === "function") {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setIsLoading(true);
     setMessage(null);
 
     try {
       let result;
       if (isLogin) {
-        result = await login(data);
+        result = await login({
+          email: formData.email,
+          password: formData.password,
+        });
       } else {
-        result = await registerUser(data);
+        result = await registerUser(formData);
       }
 
       if (result.success) {
         if (isLogin) {
-          // Redirect to dashboard on successful login
-          window.location.href = "/dashboard";
+          // Check for redirect param
+          const params = new URLSearchParams(location.search);
+          const redirect = params.get("redirect");
+          if (redirect) {
+            navigate(redirect, { replace: true });
+          } else {
+            navigate("/dashboard", { replace: true });
+          }
         } else {
           setMessage({
             type: "success",
             text: result.message || "Registration submitted successfully!",
+          });
+          setFormData({
+            name: "",
+            email: "",
+            phone: "",
+            password: "",
+            confirmPassword: "",
           });
         }
       } else {
@@ -98,7 +155,7 @@ const LoginForm = () => {
           text: result.error || "An error occurred",
         });
       }
-    } catch {
+    } catch (error) {
       setMessage({
         type: "error",
         text: "An unexpected error occurred",
@@ -110,7 +167,14 @@ const LoginForm = () => {
 
   const toggleMode = () => {
     setIsLogin(!isLogin);
-    reset();
+    setMessage(null);
+    setFormData({
+      name: "",
+      email: "",
+      phone: "",
+      password: "",
+      confirmPassword: "",
+    });
   };
 
   return (
@@ -200,7 +264,7 @@ const LoginForm = () => {
             }
             className="mx-auto w-full max-w-md"
           >
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={onSubmit} className="space-y-6">
               {/* Message display */}
               {message && (
                 <motion.div
@@ -236,8 +300,9 @@ const LoginForm = () => {
                       type="text"
                       placeholder="Enter your full name"
                       icon={User}
-                      {...register("name")}
-                      error={errors.name?.message}
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
                     />
                   </motion.div>
                 )}
@@ -248,18 +313,52 @@ const LoginForm = () => {
                 type="email"
                 placeholder="admin@alertx.com"
                 icon={Mail}
-                {...register("email")}
-                error={errors.email?.message}
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
               />
 
-              <InputField
-                label="Password"
-                type="password"
-                placeholder="Enter your password"
-                icon={Lock}
-                {...register("password")}
-                error={errors.password?.message}
-              />
+              <AnimatePresence mode="wait">
+                {!isLogin && (
+                  <motion.div
+                    key="phone"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <InputField
+                      label="Phone Number"
+                      type="tel"
+                      placeholder="+1234567890"
+                      icon={Phone}
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleChange}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="space-y-2">
+                <InputField
+                  label="Password"
+                  type="password"
+                  placeholder="Enter your password"
+                  icon={Lock}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                />
+                {!isLogin && (
+                  <div className="rounded-lg bg-blue-50 p-3">
+                    <p className="text-xs text-blue-700">
+                      <strong>Password Requirements:</strong>
+                      At least 8 characters
+                    </p>
+                  </div>
+                )}
+              </div>
 
               <AnimatePresence mode="wait">
                 {!isLogin && (
@@ -275,8 +374,9 @@ const LoginForm = () => {
                       type="password"
                       placeholder="Confirm your password"
                       icon={Lock}
-                      {...register("confirmPassword")}
-                      error={errors.confirmPassword?.message}
+                      name="confirmPassword"
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
                     />
                   </motion.div>
                 )}
@@ -296,7 +396,7 @@ const LoginForm = () => {
                 <button
                   type="button"
                   onClick={toggleMode}
-                  className="font-sans font-semibold tracking-wide text-blue-600 transition-colors hover:text-blue-700"
+                  className="focus:ring-opacity-50 rounded-md px-2 py-1 font-sans font-semibold tracking-wide text-blue-600 transition-colors hover:text-blue-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 >
                   {isLogin
                     ? "Need admin access? Apply here"

@@ -342,13 +342,29 @@ const userSchema = new mongoose.Schema(
 
     isActive: {
       type: Boolean,
-      default: true,
+      default: true, // All users are active by default
     },
 
     isVerified: {
       type: Boolean,
       default: false,
     },
+
+    // Admin approval system
+    approvalStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "approved", // Default to approved for all users
+    },
+
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+
+    approvedAt: Date,
+
+    rejectionReason: String,
 
     verificationToken: String,
     passwordResetToken: String,

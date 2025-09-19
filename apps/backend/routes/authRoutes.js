@@ -8,6 +8,8 @@ import {
   logout,
   forgotPassword,
   resetPassword,
+  getPendingAdmins,
+  approveAdmin,
 } from "../controllers/authController.js";
 import {
   validateUserRegistration,
@@ -81,6 +83,20 @@ router.post("/forgot-password", validateForgotPassword, forgotPassword);
  * @access  Public
  */
 router.post("/reset-password", validateResetPassword, resetPassword);
+
+/**
+ * @route   GET /api/v1/auth/admin/pending
+ * @desc    Get pending admin approvals
+ * @access  Private (Admin)
+ */
+router.get("/admin/pending", authenticate, getPendingAdmins);
+
+/**
+ * @route   PUT /api/v1/auth/admin/:id/approve
+ * @desc    Approve/Reject admin account
+ * @access  Private (Admin)
+ */
+router.put("/admin/:id/approve", authenticate, approveAdmin);
 
 export default router;
 

@@ -1,13 +1,21 @@
 import React from "react";
 import { motion } from "framer-motion";
 
-const MainContent = ({ children }) => {
+const MainContent = ({ children, isCollapsed }) => {
   return (
     <motion.main
       initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ delay: 0.2 }}
-      className="fixed top-20 right-4 bottom-4 left-80 overflow-hidden rounded-2xl border border-white/20 bg-white/10 shadow-xl backdrop-blur-2xl"
+      animate={{
+        opacity: 1,
+        scale: 1,
+        left: isCollapsed ? "116px" : "310px",
+      }}
+      transition={{ delay: 0.2, duration: 0.3 }}
+      className="fixed top-20 bottom-4 overflow-hidden rounded-2xl border border-gray-200 bg-gray-50"
+      style={{
+        left: isCollapsed ? "96px" : "296px",
+        right: "16px",
+      }}
     >
       <div className="h-full overflow-y-auto p-8">
         {children || (

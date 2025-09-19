@@ -4,12 +4,25 @@ import {
   Routes,
   Route,
   Navigate,
+  useLocation,
 } from "react-router-dom";
+// Redirect /controls to /dashboard/controls, preserving query params
+const ControlsRedirect = () => {
+  const location = useLocation();
+  return <Navigate to={`/dashboard/controls${location.search}`} replace />;
+};
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { LoginPage } from "./features/auth";
 import DashboardLayout from "./shared/layouts/DashboardLayout";
 import AdminDashboard from "./pages/AdminDashboard";
+import HospitalManagement from "./features/hospitals/HospitalManagement";
+import PatientManagement from "./features/patients";
+import PatientDetailsPage from "./features/patients/PatientDetailsPage.jsx";
+import AmbulancesPage from "./features/ambulances";
+import DriversPage from "./features/drivers";
+import Maps from "./features/maps";
+import { Controls } from "./features/controls";
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -45,7 +58,17 @@ const Dashboard = () => {
 
   return (
     <DashboardLayout user={user}>
-      <AdminDashboard />
+      <Routes>
+        <Route path="/" element={<AdminDashboard />} />
+        <Route path="/hospitals" element={<HospitalManagement />} />
+  <Route path="/patients" element={<PatientManagement />} />
+  <Route path="/patients/:id" element={<PatientDetailsPage />} />
+        <Route path="/ambulances" element={<AmbulancesPage />} />
+        <Route path="/drivers" element={<DriversPage />} />
+        <Route path="/maps" element={<Maps />} />
+        <Route path="/controls" element={<Controls />} />
+        {/* Add more routes here as we implement other features */}
+      </Routes>
     </DashboardLayout>
   );
 };
@@ -56,9 +79,11 @@ function App() {
       <Router>
         <AuthProvider>
           <Routes>
+            {/* Redirect /controls to /dashboard/controls */}
+            <Route path="/controls" element={<ControlsRedirect />} />
             <Route path="/login" element={<LoginPage />} />
             <Route
-              path="/dashboard"
+              path="/dashboard/*"
               element={
                 <ProtectedRoute>
                   <Dashboard />

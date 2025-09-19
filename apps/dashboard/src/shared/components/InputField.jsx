@@ -73,7 +73,7 @@ const InputField = forwardRef(
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute top-1/2 right-4 z-10 -translate-y-1/2 transform text-gray-600 transition-colors hover:text-gray-800"
+              className="focus:ring-opacity-50 absolute top-1/2 right-4 z-10 -translate-y-1/2 transform rounded-md text-gray-600 transition-colors hover:text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
               {showPassword ? (
                 <EyeOff className="h-5 w-5" />

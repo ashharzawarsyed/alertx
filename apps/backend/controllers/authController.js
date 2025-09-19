@@ -8,11 +8,12 @@ import {
 } from "../utils/helpers.js";
 import { RESPONSE_CODES, USER_ROLES } from "../utils/constants.js";
 
-/**
- * @desc    Register user
- * @route   POST /api/v1/auth/register
- * @access  Public
- */
+import {
+  sendAdminRegistrationConfirmation,
+  sendAdminApprovalRequest,
+  sendAdminApprovalConfirmation,
+} from "../services/emailService.js";
+
 export const register = asyncHandler(async (req, res) => {
   const { name, email, phone, password, role, location, notifiers } = req.body;
 
@@ -20,7 +21,6 @@ export const register = asyncHandler(async (req, res) => {
   const existingUser = await User.findOne({
     $or: [{ email }, { phone }],
   });
-
   if (existingUser) {
     return sendResponse(
       res,
@@ -72,6 +72,31 @@ export const register = asyncHandler(async (req, res) => {
   // Create user
   const user = await User.create(userData);
 
+  // If admin registration, set as pending and notify existing admins
+  if (role === USER_ROLES.ADMIN) {
+    user.approvalStatus = "pending";
+    user.isActive = false;
+    await user.save();
+    try {
+      await sendAdminRegistrationConfirmation({
+        name: user.name,
+        email: user.email,
+      });
+      await sendAdminApprovalRequest({
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        id: user._id,
+      });
+    } catch (emailError) {
+      console.error(
+        "Failed to send admin registration/approval notification:",
+        emailError
+      );
+      // Don't fail registration if email fails
+    }
+  }
+
   // Generate token
   const token = generateToken({
     id: user._id,
@@ -79,7 +104,12 @@ export const register = asyncHandler(async (req, res) => {
     role: user.role,
   });
 
-  sendResponse(res, RESPONSE_CODES.CREATED, "User registered successfully", {
+  const message =
+    role === USER_ROLES.ADMIN
+      ? "Admin registration submitted successfully. You'll receive an email once your account is activated."
+      : "User registered successfully";
+
+  sendResponse(res, RESPONSE_CODES.CREATED, message, {
     user,
     token,
   });
@@ -122,6 +152,18 @@ export const login = asyncHandler(async (req, res) => {
       RESPONSE_CODES.UNAUTHORIZED,
       "Account is deactivated"
     );
+  }
+
+  // Check admin approval status
+  if (user.role === USER_ROLES.ADMIN && user.approvalStatus !== "approved") {
+    const message =
+      user.approvalStatus === "pending"
+        ? "Account is pending approval. You'll receive an email once activated."
+        : user.approvalStatus === "rejected"
+          ? `Account has been rejected. Reason: ${user.rejectionReason || "Contact administrator"}`
+          : "Account approval required";
+
+    return sendResponse(res, RESPONSE_CODES.UNAUTHORIZED, message);
   }
 
   // Update last login
@@ -305,4 +347,108 @@ export const resetPassword = asyncHandler(async (req, res) => {
   await user.save();
 
   sendResponse(res, RESPONSE_CODES.SUCCESS, "Password reset successful");
+});
+
+/**
+ * @desc    Get pending admin approvals (Admin only)
+ * @route   GET /api/v1/auth/admin/pending
+ * @access  Private (Admin)
+ */
+export const getPendingAdmins = asyncHandler(async (req, res) => {
+  // Only admins can approve other admins
+  if (req.user.role !== USER_ROLES.ADMIN) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.FORBIDDEN,
+      "Access denied. Admin privileges required."
+    );
+  }
+
+  const pendingAdmins = await User.find({
+    role: USER_ROLES.ADMIN,
+    approvalStatus: "pending",
+  }).select("-password");
+
+  sendResponse(
+    res,
+    RESPONSE_CODES.SUCCESS,
+    "Pending admin approvals retrieved",
+    {
+      admins: pendingAdmins,
+      count: pendingAdmins.length,
+    }
+  );
+});
+
+/**
+ * @desc    Approve/Reject admin account (Admin only)
+ * @route   PUT /api/v1/auth/admin/:id/approve
+ * @access  Private (Admin)
+ */
+export const approveAdmin = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { approved, reason } = req.body;
+
+  // Only admins can approve other admins
+  if (req.user.role !== USER_ROLES.ADMIN) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.FORBIDDEN,
+      "Access denied. Admin privileges required."
+    );
+  }
+
+  const admin = await User.findById(id);
+
+  if (!admin) {
+    return sendResponse(res, RESPONSE_CODES.NOT_FOUND, "Admin not found");
+  }
+
+  if (admin.role !== USER_ROLES.ADMIN) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.BAD_REQUEST,
+      "User is not an admin"
+    );
+  }
+
+  if (admin.approvalStatus !== "pending") {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.BAD_REQUEST,
+      "Admin approval has already been processed"
+    );
+  }
+
+  // Update approval status
+  admin.approvalStatus = approved ? "approved" : "rejected";
+  admin.approvedBy = req.user.id;
+  admin.approvedAt = new Date();
+  admin.isActive = approved; // Activate account if approved
+
+  if (!approved && reason) {
+    admin.rejectionReason = reason;
+  }
+
+  await admin.save();
+
+  // Send email notification to the admin
+  try {
+    await sendAdminApprovalConfirmation(
+      {
+        name: admin.name,
+        email: admin.email,
+      },
+      approved
+    );
+  } catch (emailError) {
+    console.error("Failed to send approval confirmation email:", emailError);
+    // Don't fail the approval process if email fails
+  }
+
+  const message = approved
+    ? "Admin account approved successfully"
+    : "Admin account rejected";
+
+  sendResponse(res, RESPONSE_CODES.SUCCESS, message, { admin });
 });

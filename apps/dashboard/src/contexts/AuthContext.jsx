@@ -101,9 +101,33 @@ export function AuthProvider({ children }) {
   // Login function
   const login = async (credentials) => {
     try {
+      console.log("AuthContext login called with:", credentials);
       dispatch({ type: authActions.SET_LOADING, payload: true });
 
-      const response = await authAPI.login(credentials);
+      let response;
+      try {
+        response = await authAPI.login(credentials);
+      } catch (apiError) {
+        // If API throws, catch and return error
+        console.error("authAPI.login threw error:", apiError);
+        dispatch({ type: authActions.SET_LOADING, payload: false });
+        return {
+          success: false,
+          error:
+            apiError.response?.data?.message ||
+            apiError.message ||
+            "Login failed",
+        };
+      }
+
+      if (!response || !response.token || !response.user) {
+        console.error("Invalid response structure:", response);
+        dispatch({ type: authActions.SET_LOADING, payload: false });
+        return {
+          success: false,
+          error: "Invalid response from server",
+        };
+      }
 
       // Store in localStorage
       localStorage.setItem("alertx_admin_token", response.token);
@@ -114,12 +138,15 @@ export function AuthProvider({ children }) {
         payload: { user: response.user, token: response.token },
       });
 
+      console.log("Login successful, dispatched LOGIN_SUCCESS");
       return { success: true };
     } catch (error) {
+      // Defensive fallback: should never reach here, but just in case
+      console.error("AuthContext login unexpected error:", error);
       dispatch({ type: authActions.SET_LOADING, payload: false });
       return {
         success: false,
-        error: error.response?.data?.message || error.message || "Login failed",
+        error: "An unexpected error occurred during login. Please try again.",
       };
     }
   };

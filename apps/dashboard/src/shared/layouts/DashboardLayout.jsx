@@ -1,25 +1,27 @@
-import React from "react";
+import React, { useState } from "react";
 import Sidebar from "../components/Sidebar";
 import TopNavbar from "../components/TopNavbar";
 import MainContent from "../components/MainContent";
-import DynamicBackground from "../components/DynamicBackground";
 
 const DashboardLayout = ({ children, user }) => {
-  return (
-    <div className="relative min-h-screen overflow-hidden">
-      {/* Animated Background */}
-      <DynamicBackground />
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-gray-50">
       {/* Layout Container */}
       <div className="relative z-10">
         {/* Sidebar */}
-        <Sidebar user={user} />
+        <Sidebar
+          user={user}
+          isCollapsed={isCollapsed}
+          setIsCollapsed={setIsCollapsed}
+        />
 
         {/* Top Navigation */}
-        <TopNavbar user={user} />
+        <TopNavbar user={user} isCollapsed={isCollapsed} />
 
         {/* Main Content Area */}
-        <MainContent>{children}</MainContent>
+        <MainContent isCollapsed={isCollapsed}>{children}</MainContent>
       </div>
     </div>
   );

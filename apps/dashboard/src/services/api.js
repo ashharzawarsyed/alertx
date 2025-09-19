@@ -30,7 +30,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem("alertx_admin_token");
       localStorage.removeItem("alertx_admin_user");
-      window.location.href = "/login";
+      // Removed forced reload. Let UI handle navigation.
     }
     return Promise.reject(error);
   },
@@ -38,11 +38,22 @@ api.interceptors.response.use(
 
 export const authAPI = {
   login: async (credentials) => {
-    const response = await api.post("/api/v1/auth/login", {
-      ...credentials,
-      role: "admin", // Ensure only admin login
-    });
-    return response.data.data; // Extract data from response wrapper
+    console.log("API login called with:", credentials);
+    try {
+      const response = await api.post("/api/v1/auth/login", {
+        email: credentials.email,
+        password: credentials.password,
+        // role: "admin", // Temporarily removed to test
+      });
+      console.log("API response received:", response);
+      console.log("Response data:", response.data);
+      console.log("Response data.data:", response.data.data);
+      return response.data.data; // Extract data from response wrapper which contains {user, token}
+    } catch (error) {
+      console.error("API login error:", error);
+      console.error("Error response:", error.response);
+      throw error;
+    }
   },
 
   register: async (userData) => {

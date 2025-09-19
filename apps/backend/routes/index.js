@@ -1,3 +1,4 @@
+
 import express from "express";
 import authRoutes from "./authRoutes.js";
 import medicalProfileRoutes from "./medicalProfileRoutes.js";
@@ -6,6 +7,7 @@ import hospitalRoutes from "./hospitalRoutes.js";
 import userRoutes from "./userRoutes.js";
 import tripRoutes from "./tripRoutes.js";
 import debugRoutes from "./debugRoutes.js";
+import globalSearchRoutes from "./globalSearchRoutes.js";
 
 const router = express.Router();
 
@@ -17,6 +19,7 @@ router.use("/hospitals", hospitalRoutes);
 router.use("/users", userRoutes);
 router.use("/trips", tripRoutes);
 router.use("/debug", debugRoutes);
+router.use("/global-search", globalSearchRoutes);
 
 // API Info
 router.get("/", (req, res) => {
