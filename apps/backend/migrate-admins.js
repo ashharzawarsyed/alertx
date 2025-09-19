@@ -2,10 +2,8 @@ import mongoose from "mongoose";
 import User from "./models/User.js";
 import { USER_ROLES } from "./utils/constants.js";
 
-// MongoDB connection string - update if different
-const MONGODB_URI =
-  process.env.MONGO_URI ||
-  "mongodb+srv://ashharzawarsyedwork_db_user:RyomzSZngFQhShCe@alertx-cluster.krkaqh4.mongodb.net/alertx";
+// MongoDB connection string (from .env file only)
+const MONGODB_URI = process.env.MONGO_URI;
 
 async function migrateExistingAdmins() {
   try {
