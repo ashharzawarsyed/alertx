@@ -14,7 +14,8 @@ const hospitalApi = axios.create({
 });
 
 // For development/testing - use mock data when backend is not available
-const USE_MOCK_DATA = true; // Set to false when backend is ready
+// For production - use real backend API
+const USE_MOCK_DATA = false; // Set to false for production
 
 // Mock API delay to simulate real API calls
 const mockDelay = (ms = 800) =>
