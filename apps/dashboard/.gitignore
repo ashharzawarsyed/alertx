@@ -1,3 +1,11 @@
+# Ignore mock data files
+mock-data.json
+mockData.json
+mock-data.js
+mockData.js
+mocks/
+# Ignore mock data used for local development
+data/mockData.js
 # Logs
 logs
 *.log

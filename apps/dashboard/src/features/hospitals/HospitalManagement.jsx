@@ -49,14 +49,11 @@ const HospitalManagementContent = () => {
     return hospitalList.filter((hospital) => {
       const matchesSearch =
         hospital.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        hospital.location.toLowerCase().includes(searchTerm.toLowerCase());
+        (typeof hospital.location === "string" &&
+          hospital.location.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      const matchesType = filterType === "all" || hospital.type === filterType;
-
-      const matchesStatus =
-        statusFilter === "all" || hospital.status === statusFilter;
-
-      return matchesSearch && matchesType && matchesStatus;
+      // Show all hospitals regardless of type/status for now
+      return matchesSearch;
     });
   };
 
@@ -75,9 +72,23 @@ const HospitalManagementContent = () => {
     const active = hospitalList.filter(
       (h) => h.status === "operational",
     ).length;
-    const totalBeds = hospitalList.reduce((sum, h) => sum + h.totalBeds, 0);
+    // Helper to sum beds, handling both numbers and objects
+    function sumBeds(val) {
+      if (typeof val === "number") return val;
+      if (typeof val === "object" && val !== null) {
+        return Object.values(val).reduce(
+          (a, b) => a + (typeof b === "number" ? b : 0),
+          0,
+        );
+      }
+      return 0;
+    }
+    const totalBeds = hospitalList.reduce(
+      (sum, h) => sum + sumBeds(h.totalBeds),
+      0,
+    );
     const occupiedBeds = hospitalList.reduce(
-      (sum, h) => sum + h.occupiedBeds,
+      (sum, h) => sum + sumBeds(h.occupiedBeds),
       0,
     );
     const utilization =

@@ -1,3 +1,9 @@
+# Ignore mock data files
+**/mock-data.json
+**/mockData.json
+**/mock-data.js
+**/mockData.js
+**/mocks/
 # Dependencies
 node_modules/
 npm-debug.log*

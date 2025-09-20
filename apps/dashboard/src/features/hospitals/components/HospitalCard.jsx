@@ -52,10 +52,37 @@ const HospitalCard = ({ hospital, onViewDetails, onEdit }) => {
   const statusConfig = getStatusConfig(hospital.status);
   const StatusIcon = statusConfig.icon;
 
+  // Helper to sum beds, handling both numbers and objects
+  function sumBeds(val) {
+    if (typeof val === "number") return val;
+    if (typeof val === "object" && val !== null) {
+      return Object.values(val).reduce(
+        (a, b) => a + (typeof b === "number" ? b : 0),
+        0,
+      );
+    }
+    return 0;
+  }
+
+  // For display: show details if object, else just the number
+  function bedDetails(val) {
+    if (typeof val === "number") return val;
+    if (typeof val === "object" && val !== null) {
+      return Object.entries(val)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(", ");
+    }
+    return "";
+  }
+
+  const totalBeds = sumBeds(hospital.totalBeds);
+  const availableBeds = sumBeds(hospital.availableBeds);
+  const icuBeds = sumBeds(hospital.icuBeds);
+  const availableIcuBeds = sumBeds(hospital.availableIcuBeds);
   const bedUtilization =
-    ((hospital.totalBeds - hospital.availableBeds) / hospital.totalBeds) * 100;
+    totalBeds > 0 ? ((totalBeds - availableBeds) / totalBeds) * 100 : 0;
   const icuUtilization =
-    ((hospital.icuBeds - hospital.availableIcuBeds) / hospital.icuBeds) * 100;
+    icuBeds > 0 ? ((icuBeds - availableIcuBeds) / icuBeds) * 100 : 0;
 
   const getUtilizationColor = (percentage) => {
     if (percentage >= 90) return "text-red-600 bg-red-100";
@@ -77,7 +104,13 @@ const HospitalCard = ({ hospital, onViewDetails, onEdit }) => {
             </h3>
             <div className="mt-2 flex items-center gap-2 text-gray-600">
               <MapPin className="h-4 w-4 flex-shrink-0" />
-              <span className="truncate text-sm">{hospital.location}</span>
+              <span className="truncate text-sm">
+                {typeof hospital.location === "string"
+                  ? hospital.location
+                  : hospital.location && typeof hospital.location === "object"
+                    ? `(${hospital.location.lat}, ${hospital.location.lng})`
+                    : ""}
+              </span>
             </div>
           </div>
 
@@ -99,7 +132,11 @@ const HospitalCard = ({ hospital, onViewDetails, onEdit }) => {
           <div className="flex items-center gap-1">
             <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
             <span className="font-semibold text-gray-900">
-              {hospital.rating}
+              {typeof hospital.rating === "object" && hospital.rating !== null
+                ? hospital.rating.average !== undefined
+                  ? hospital.rating.average
+                  : JSON.stringify(hospital.rating)
+                : hospital.rating}
             </span>
             <span className="text-sm text-gray-600">rating</span>
           </div>
@@ -125,8 +162,15 @@ const HospitalCard = ({ hospital, onViewDetails, onEdit }) => {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-gray-900">
-                {hospital.availableBeds}/{hospital.totalBeds}
+              <span
+                className="text-sm font-semibold text-gray-900"
+                title={
+                  bedDetails(hospital.availableBeds) +
+                  "/" +
+                  bedDetails(hospital.totalBeds)
+                }
+              >
+                {availableBeds}/{totalBeds}
               </span>
               <span
                 className={clsx(
@@ -147,8 +191,15 @@ const HospitalCard = ({ hospital, onViewDetails, onEdit }) => {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-gray-900">
-                {hospital.availableIcuBeds}/{hospital.icuBeds}
+              <span
+                className="text-sm font-semibold text-gray-900"
+                title={
+                  bedDetails(hospital.availableIcuBeds) +
+                  "/" +
+                  bedDetails(hospital.icuBeds)
+                }
+              >
+                {availableIcuBeds}/{icuBeds}
               </span>
               <span
                 className={clsx(
@@ -166,7 +217,14 @@ const HospitalCard = ({ hospital, onViewDetails, onEdit }) => {
         <div className="mb-4 rounded-lg bg-gray-50 p-3">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-gray-700">
-              {hospital.emergencyRoom}
+              {typeof hospital.emergencyRoom === "object" &&
+              hospital.emergencyRoom !== null
+                ? Array.isArray(hospital.emergencyRoom)
+                  ? hospital.emergencyRoom.join(", ")
+                  : Object.entries(hospital.emergencyRoom)
+                      .map(([key, value]) => `${key}: ${value}`)
+                      .join(", ")
+                : hospital.emergencyRoom}
             </span>
           </div>
         </div>
@@ -175,17 +233,19 @@ const HospitalCard = ({ hospital, onViewDetails, onEdit }) => {
         <div className="mb-4">
           <div className="h-16 overflow-hidden">
             <div className="flex flex-wrap gap-1">
-              {hospital.specialties.slice(0, 4).map((specialty, index) => (
-                <span
-                  key={index}
-                  className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium whitespace-nowrap text-blue-700"
-                >
-                  {specialty}
-                </span>
-              ))}
-              {hospital.specialties.length > 4 && (
+              {(hospital.specialties || [])
+                .slice(0, 4)
+                .map((specialty, index) => (
+                  <span
+                    key={index}
+                    className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium whitespace-nowrap text-blue-700"
+                  >
+                    {specialty}
+                  </span>
+                ))}
+              {(hospital.specialties || []).length > 4 && (
                 <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium whitespace-nowrap text-gray-600">
-                  +{hospital.specialties.length - 4} more
+                  +{(hospital.specialties || []).length - 4} more
                 </span>
               )}
             </div>
@@ -195,12 +255,19 @@ const HospitalCard = ({ hospital, onViewDetails, onEdit }) => {
         {/* Contact Info */}
         <div className="mb-3 flex items-center gap-2 text-gray-600">
           <Phone className="h-4 w-4" />
-          <span className="truncate text-sm">{hospital.phone}</span>
+          <span className="truncate text-sm">
+            {typeof hospital.phone === "object"
+              ? JSON.stringify(hospital.phone)
+              : hospital.phone}
+          </span>
         </div>
 
         {/* Last Updated - Push to bottom */}
         <div className="mt-auto text-xs text-gray-500">
-          Last updated: {hospital.lastUpdated}
+          Last updated:{" "}
+          {typeof hospital.lastUpdated === "object"
+            ? JSON.stringify(hospital.lastUpdated)
+            : hospital.lastUpdated}
         </div>
       </div>
 
