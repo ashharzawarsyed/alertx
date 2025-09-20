@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import User from "./models/User.js";
 import { USER_ROLES } from "./utils/constants.js";
-
+import "dotenv/config";
 // MongoDB connection string (from .env file only)
 const MONGODB_URI = process.env.MONGO_URI;
 
