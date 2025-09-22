@@ -5,6 +5,7 @@ A dedicated React + Vite dashboard for hospital staff to manage their operations
 ## Overview
 
 This is a separate dashboard from the main admin dashboard, specifically designed for hospital staff to:
+
 - Manage hospital bed availability
 - View incoming emergency patients
 - Update hospital status and capacity
@@ -19,22 +20,28 @@ This is a separate dashboard from the main admin dashboard, specifically designe
 ## Development
 
 ### Prerequisites
+
 - Node.js >= 18.0.0
 - npm >= 8.0.0
 
 ### Installation
+
 From the monorepo root:
+
 ```bash
 npm install
 ```
 
 ### Running the Development Server
+
 From the monorepo root:
+
 ```bash
 npm run hospital-dashboard
 ```
 
 Or directly from this directory:
+
 ```bash
 npm run dev
 ```
@@ -44,6 +51,7 @@ The application will be available at: http://localhost:5173/
 ## Monorepo Integration
 
 This project is part of the AlertX monorepo and maintains version consistency with the admin dashboard:
+
 - React: 19.0.0 (exact match with admin dashboard)
 - react-dom: 19.0.0 (exact match with admin dashboard)
 - Vite: ^7.1.2 (consistent with admin dashboard)

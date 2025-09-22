@@ -1,41 +1,42 @@
-import { gsap } from 'gsap';
-import { 
-  Activity, 
-  Bell, 
-  Calendar, 
-  ChartLineUp, 
-  Gear, 
-  House, 
-  HeartStraight, 
-  SignOut, 
-  User, 
-  Users 
-} from 'phosphor-react';
-import React, { useEffect, useRef, useState } from 'react';
+import { gsap } from "gsap";
+import {
+  Activity,
+  Bell,
+  Calendar,
+  ChartLineUp,
+  Gear,
+  House,
+  HeartStraight,
+  SignOut,
+  User,
+  Users,
+} from "phosphor-react";
+import React, { useEffect, useRef, useState } from "react";
 
 const Navigation = () => {
   const navRef = useRef(null);
-  const [activeItem, setActiveItem] = useState('dashboard');
+  const [activeItem, setActiveItem] = useState("dashboard");
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   useEffect(() => {
     // Simple entrance animation for navigation
-    gsap.fromTo(navRef.current, 
+    gsap.fromTo(
+      navRef.current,
       { y: -20, opacity: 0 },
       { y: 0, opacity: 1, duration: 0.6, ease: "power2.out" }
     );
   }, []);
 
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: House },
-    { id: 'patients', label: 'Patients', icon: Users },
-    { id: 'emergencies', label: 'Emergencies', icon: Activity },
-    { id: 'analytics', label: 'Analytics', icon: ChartLineUp },
-    { id: 'appointments', label: 'Appointments', icon: Calendar },
+    { id: "dashboard", label: "Dashboard", icon: House },
+    { id: "patients", label: "Patients", icon: Users },
+    { id: "emergencies", label: "Emergencies", icon: Activity },
+    { id: "analytics", label: "Analytics", icon: ChartLineUp },
+    { id: "appointments", label: "Appointments", icon: Calendar },
   ];
 
   return (
-    <nav 
+    <nav
       ref={navRef}
       className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-b border-slate-200/60 shadow-sm"
     >
@@ -54,16 +55,17 @@ const Navigation = () => {
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeItem === item.id;
-              
+
               return (
                 <button
                   key={item.id}
                   onClick={() => setActiveItem(item.id)}
                   className={`
                     flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200
-                    ${isActive 
-                      ? 'bg-blue-50 text-blue-600 border border-blue-200/50' 
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    ${
+                      isActive
+                        ? "bg-blue-50 text-blue-600 border border-blue-200/50"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                     }
                   `}
                 >
@@ -91,7 +93,7 @@ const Navigation = () => {
 
             {/* Profile Dropdown */}
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
                 className="flex items-center space-x-3 p-2 rounded-lg hover:bg-slate-50 transition-colors"
               >
@@ -99,7 +101,9 @@ const Navigation = () => {
                   <User size={16} className="text-white" weight="bold" />
                 </div>
                 <div className="hidden sm:block text-left">
-                  <p className="text-sm font-medium text-slate-900">Dr. Sarah Chen</p>
+                  <p className="text-sm font-medium text-slate-900">
+                    Dr. Sarah Chen
+                  </p>
                   <p className="text-xs text-slate-600">Administrator</p>
                 </div>
               </button>
@@ -108,7 +112,9 @@ const Navigation = () => {
               {isProfileOpen && (
                 <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200/60 backdrop-blur-lg overflow-hidden">
                   <div className="p-3 border-b border-slate-200/60">
-                    <p className="text-sm font-medium text-slate-900">Dr. Sarah Chen</p>
+                    <p className="text-sm font-medium text-slate-900">
+                      Dr. Sarah Chen
+                    </p>
                     <p className="text-xs text-slate-600">Administrator</p>
                   </div>
                   <div className="p-2">
