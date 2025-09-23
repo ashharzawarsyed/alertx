@@ -10,6 +10,7 @@ import {
   resetPassword,
   getPendingAdmins,
   approveAdmin,
+  registerHospital,
 } from "../controllers/authController.js";
 import {
   validateUserRegistration,
@@ -18,6 +19,7 @@ import {
   validateForgotPassword,
   validateResetPassword,
   validateUpdateProfile,
+  validateHospitalRegistration,
 } from "../middlewares/validation.js";
 import { authenticate } from "../middlewares/auth.js";
 
@@ -29,6 +31,17 @@ const router = express.Router();
  * @access  Public
  */
 router.post("/register", validateUserRegistration, register);
+
+/**
+ * @route   POST /api/v1/auth/register/hospital
+ * @desc    Register a new hospital with admin account
+ * @access  Public
+ */
+router.post(
+  "/register/hospital",
+  validateHospitalRegistration,
+  registerHospital
+);
 
 /**
  * @route   POST /api/v1/auth/login

@@ -61,8 +61,8 @@ const Dashboard = () => {
       <Routes>
         <Route path="/" element={<AdminDashboard />} />
         <Route path="/hospitals" element={<HospitalManagement />} />
-  <Route path="/patients" element={<PatientManagement />} />
-  <Route path="/patients/:id" element={<PatientDetailsPage />} />
+        <Route path="/patients" element={<PatientManagement />} />
+        <Route path="/patients/:id" element={<PatientDetailsPage />} />
         <Route path="/ambulances" element={<AmbulancesPage />} />
         <Route path="/drivers" element={<DriversPage />} />
         <Route path="/maps" element={<Maps />} />

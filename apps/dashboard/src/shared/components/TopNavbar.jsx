@@ -27,7 +27,7 @@ const TopNavbar = ({ user, isCollapsed }) => {
     setNotifLoading(true);
     try {
       const token = localStorage.getItem("alertx_admin_token");
-      const res = await fetch("http://localhost:5000/api/v1/auth/admin/pending", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/auth/admin/pending`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {

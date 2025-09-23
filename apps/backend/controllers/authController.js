@@ -1,4 +1,5 @@
 import User from "../models/User.js";
+import Hospital from "../models/Hospital.js";
 import { asyncHandler } from "../middlewares/errorHandler.js";
 import {
   generateToken,
@@ -12,6 +13,8 @@ import {
   sendAdminRegistrationConfirmation,
   sendAdminApprovalRequest,
   sendAdminApprovalConfirmation,
+  sendHospitalRegistrationConfirmation,
+  sendHospitalApprovalRequest,
 } from "../services/emailService.js";
 
 export const register = asyncHandler(async (req, res) => {
@@ -60,23 +63,28 @@ export const register = asyncHandler(async (req, res) => {
     };
   }
 
-  if (role === USER_ROLES.HOSPITAL_STAFF) {
-    const { hospitalInfo } = req.body;
-    const { hospitalId, position } = hospitalInfo || req.body;
-    userData.hospitalInfo = {
-      hospitalId,
-      position,
-    };
-  }
-
   // Create user
   const user = await User.create(userData);
 
   // If admin registration, set as pending and notify existing admins
   if (role === USER_ROLES.ADMIN) {
+    console.log("Registering new admin user:", {
+      name,
+      email,
+      role,
+      id: user._id,
+    });
+
     user.approvalStatus = "pending";
     user.isActive = false;
     await user.save();
+
+    console.log("Admin user saved with status:", {
+      approvalStatus: user.approvalStatus,
+      isActive: user.isActive,
+      id: user._id,
+    });
+
     try {
       await sendAdminRegistrationConfirmation({
         name: user.name,
@@ -88,6 +96,7 @@ export const register = asyncHandler(async (req, res) => {
         phone: user.phone,
         id: user._id,
       });
+      console.log("Admin registration notifications sent successfully");
     } catch (emailError) {
       console.error(
         "Failed to send admin registration/approval notification:",
@@ -123,8 +132,8 @@ export const register = asyncHandler(async (req, res) => {
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  // Find user and include password for comparison
-  const user = await User.findOne({ email }).select("+password");
+  // Find user and include password and role for comparison
+  const user = await User.findOne({ email }).select("+password role");
 
   if (!user) {
     return sendResponse(
@@ -160,8 +169,25 @@ export const login = asyncHandler(async (req, res) => {
       user.approvalStatus === "pending"
         ? "Account is pending approval. You'll receive an email once activated."
         : user.approvalStatus === "rejected"
-          ? `Account has been rejected. Reason: ${user.rejectionReason || "Contact administrator"}`
-          : "Account approval required";
+        ? `Account has been rejected. Reason: ${
+            user.rejectionReason || "Contact administrator"
+          }`
+        : "Account approval required";
+
+    return sendResponse(res, RESPONSE_CODES.UNAUTHORIZED, message);
+  }
+
+  // Check hospital approval status
+  if (user.role === USER_ROLES.HOSPITAL && user.approvalStatus !== "approved") {
+    const message =
+      user.approvalStatus === "pending"
+        ? "Your hospital registration is pending approval. You'll receive an email once your account is activated."
+        : user.approvalStatus === "rejected"
+        ? `Your hospital registration has been rejected. Reason: ${
+            user.rejectionReason ||
+            "Please contact support for more information."
+          }`
+        : "Hospital approval required";
 
     return sendResponse(res, RESPONSE_CODES.UNAUTHORIZED, message);
   }
@@ -355,8 +381,23 @@ export const resetPassword = asyncHandler(async (req, res) => {
  * @access  Private (Admin)
  */
 export const getPendingAdmins = asyncHandler(async (req, res) => {
+  console.log("getPendingAdmins called with user:", {
+    id: req.user?.id,
+    email: req.user?.email,
+    role: req.user?.role,
+  });
+
   // Only admins can approve other admins
+  console.log("Checking user role:", {
+    userRole: req.user.role,
+    expectedRole: USER_ROLES.ADMIN,
+    isAdmin: req.user.role === USER_ROLES.ADMIN,
+    userRoleType: typeof req.user.role,
+    adminRoleType: typeof USER_ROLES.ADMIN,
+  });
+
   if (req.user.role !== USER_ROLES.ADMIN) {
+    console.log("Access denied. User role is not admin:", req.user.role);
     return sendResponse(
       res,
       RESPONSE_CODES.FORBIDDEN,
@@ -364,10 +405,32 @@ export const getPendingAdmins = asyncHandler(async (req, res) => {
     );
   }
 
+  console.log("Searching for pending admins with role:", USER_ROLES.ADMIN);
+
   const pendingAdmins = await User.find({
     role: USER_ROLES.ADMIN,
     approvalStatus: "pending",
-  }).select("-password");
+    isActive: false,
+  })
+    .select("-password")
+    .sort({ createdAt: -1 });
+
+  console.log("Found pending admins:", pendingAdmins);
+
+  // Debug log to check if any admins exist at all
+  const allAdmins = await User.find({ role: USER_ROLES.ADMIN }).select(
+    "-password"
+  );
+  console.log("All admins in system:", allAdmins.length);
+  console.log(
+    "Admin details:",
+    allAdmins.map((admin) => ({
+      id: admin._id,
+      email: admin.email,
+      status: admin.approvalStatus,
+      isActive: admin.isActive,
+    }))
+  );
 
   sendResponse(
     res,
@@ -451,4 +514,153 @@ export const approveAdmin = asyncHandler(async (req, res) => {
     : "Admin account rejected";
 
   sendResponse(res, RESPONSE_CODES.SUCCESS, message, { admin });
+});
+
+/**
+ * @desc    Register hospital with admin account
+ * @route   POST /api/v1/auth/register/hospital
+ * @access  Public
+ */
+export const registerHospital = asyncHandler(async (req, res) => {
+  const {
+    // Hospital details
+    hospitalName,
+    hospitalType,
+    licenseNumber,
+    address,
+    city,
+    state,
+    zipCode,
+    country,
+    latitude,
+    longitude,
+    contactNumber,
+    email,
+    totalBeds,
+    facilities,
+    emergencyContact,
+    operatingHours,
+    password,
+  } = req.body;
+
+  // Check if hospital already exists
+  const existingHospital = await Hospital.findOne({
+    $or: [{ email }, { name: hospitalName }],
+  });
+
+  if (existingHospital) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.CONFLICT,
+      "Hospital with this email or name already exists"
+    );
+  }
+
+  // Check if admin user already exists
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.CONFLICT,
+      "User already exists with this email"
+    );
+  }
+
+  // Create hospital data object
+  const hospitalData = {
+    name: hospitalName,
+    type: hospitalType,
+    licenseNumber,
+    address: `${address}, ${city}, ${state} ${zipCode}, ${country}`,
+    contactNumber,
+    email,
+    totalBeds: {
+      general: parseInt(totalBeds.general),
+      icu: parseInt(totalBeds.icu),
+      emergency: parseInt(totalBeds.emergency),
+      operation: parseInt(totalBeds.operation) || 0,
+    },
+    availableBeds: {
+      general: parseInt(totalBeds.general),
+      icu: parseInt(totalBeds.icu),
+      emergency: parseInt(totalBeds.emergency),
+      operation: parseInt(totalBeds.operation) || 0,
+    },
+    facilities: facilities || [],
+    emergencyContact,
+    operatingHours: operatingHours || { isOpen24x7: true },
+    isActive: false, // Pending approval
+    isVerified: false,
+  };
+
+  // Add location only if provided
+  if (latitude && longitude) {
+    hospitalData.location = {
+      lat: parseFloat(latitude),
+      lng: parseFloat(longitude),
+    };
+  }
+
+  // Create hospital first
+  const hospital = await Hospital.create(hospitalData);
+
+  // Create hospital user account
+  const userData = {
+    name: hospitalName, // Use hospital name as user name
+    email,
+    phone: contactNumber,
+    password,
+    role: USER_ROLES.HOSPITAL,
+    hospitalInfo: {
+      hospitalId: hospital._id,
+    },
+    isActive: false, // Pending approval
+    approvalStatus: "pending",
+  };
+
+  const user = await User.create(userData);
+
+  // Send email notifications
+  try {
+    // Send confirmation email to hospital
+    await sendHospitalRegistrationConfirmation({
+      name: hospitalName,
+      email: email,
+      hospitalType: hospitalType,
+    });
+
+    // Send approval request to all active admins
+    await sendHospitalApprovalRequest({
+      hospitalName,
+      email,
+      hospitalType,
+      licenseNumber,
+      address: `${address}, ${city}, ${state} ${zipCode}, ${country}`,
+      contactNumber,
+      registrationDate: new Date(),
+      hospitalId: hospital._id,
+    });
+  } catch (emailError) {
+    console.error("Email notification failed:", emailError);
+    // Don't fail the registration if email fails
+  }
+
+  sendResponse(
+    res,
+    RESPONSE_CODES.CREATED,
+    "Hospital registration submitted successfully. You'll receive an email once your account is activated.",
+    {
+      hospital: {
+        id: hospital._id,
+        name: hospital.name,
+        email: hospital.email,
+        status: hospital.approvalStatus,
+      },
+      user: {
+        id: user._id,
+        email: user.email,
+        role: user.role,
+      },
+    }
+  );
 });

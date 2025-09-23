@@ -16,7 +16,7 @@ import {
 import {
   authenticate,
   adminOnly,
-  hospitalStaffOrAdmin,
+  hospitalOrAdmin,
 } from "../middlewares/auth.js";
 
 const router = express.Router();
@@ -45,12 +45,12 @@ router.get("/:id", validateObjectId("id"), getHospitalById);
 /**
  * @route   PUT /api/v1/hospitals/:id
  * @desc    Update hospital information
- * @access  Private (Hospital staff or Admin)
+ * @access  Private (Hospital or Admin)
  */
 router.put(
   "/:id",
   authenticate,
-  hospitalStaffOrAdmin,
+  hospitalOrAdmin,
   validateObjectId("id"),
   updateHospital
 );
@@ -63,7 +63,7 @@ router.put(
 router.put(
   "/:id/beds",
   authenticate,
-  hospitalStaffOrAdmin,
+  hospitalOrAdmin,
   validateObjectId("id"),
   updateBedAvailability
 );
@@ -78,12 +78,12 @@ router.get("/pending", authenticate, adminOnly, getPendingHospitals);
 /**
  * @route   GET /api/v1/hospitals/:id/stats
  * @desc    Get hospital statistics
- * @access  Private (Hospital staff or Admin)
+ * @access  Private (Hospital or Admin)
  */
 router.get(
   "/:id/stats",
   authenticate,
-  hospitalStaffOrAdmin,
+  hospitalOrAdmin,
   validateObjectId("id"),
   getHospitalStats
 );

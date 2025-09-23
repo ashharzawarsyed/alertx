@@ -25,11 +25,13 @@ const AdminApprovals = () => {
       setLoading(true);
       const token = localStorage.getItem("alertx_admin_token");
       const response = await fetch(
-        "http://localhost:5000/api/v1/auth/admin/pending",
+        `${import.meta.env.VITE_API_URL}/api/v1/auth/admin/pending`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
           },
+          credentials: 'include',
         },
       );
 
@@ -37,10 +39,15 @@ const AdminApprovals = () => {
         const data = await response.json();
         setPendingAdmins(data.data.admins || []);
       } else {
-        // Handle fetch error
+        const error = await response.json();
+        console.error("Failed to fetch pending admins:", error);
+        // Check if unauthorized or forbidden
+        if (response.status === 403) {
+          console.error("Access forbidden. Current user role may not be admin.");
+        }
       }
-    } catch {
-      // Handle error
+    } catch (error) {
+      console.error("Error fetching pending admins:", error);
     } finally {
       setLoading(false);
     }
@@ -56,7 +63,7 @@ const AdminApprovals = () => {
       setActionLoading(adminId);
       const token = localStorage.getItem("alertx_admin_token");
       const response = await fetch(
-        `http://localhost:5000/api/v1/auth/admin/${adminId}/approve`,
+        `${import.meta.env.VITE_API_URL}/api/v1/auth/admin/${adminId}/approve`,
         {
           method: "PUT",
           headers: {
@@ -91,7 +98,7 @@ const AdminApprovals = () => {
       setActionLoading(adminId);
       const token = localStorage.getItem("alertx_admin_token");
       const response = await fetch(
-        `http://localhost:5000/api/v1/auth/admin/${adminId}/approve`,
+        `${import.meta.env.VITE_API_URL}/api/v1/auth/admin/${adminId}/approve`,
         {
           method: "PUT",
           headers: {

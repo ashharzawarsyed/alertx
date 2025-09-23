@@ -100,19 +100,13 @@ const userSchema = new mongoose.Schema(
       },
     },
 
-    // For hospital staff
+    // For hospital registration
     hospitalInfo: {
       hospitalId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Hospital",
         required: function () {
-          return this.role === USER_ROLES.HOSPITAL_STAFF;
-        },
-      },
-      position: {
-        type: String,
-        required: function () {
-          return this.role === USER_ROLES.HOSPITAL_STAFF;
+          return this.role === USER_ROLES.HOSPITAL;
         },
       },
     },

@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
-import rateLimit from "express-rate-limit";
+// import rateLimit from "express-rate-limit"; // DISABLED FOR DEVELOPMENT
 
 import connectDB from "./config/db.js";
 import { errorHandler, notFound } from "./middlewares/errorHandler.js";
@@ -33,18 +33,18 @@ const corsOptions = {
 //app.use in Express.js is a method for mounting middleware.
 app.use(cors(corsOptions));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // max requests per IP
-  message: {
-    error: "Too many requests from this IP, please try again later.",
-    retryAfter: "15 minutes",
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use("/api", limiter);
+// Rate limiting - DISABLED FOR DEVELOPMENT
+// const limiter = rateLimit({
+//   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+//   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000, // max requests per IP - increased for development
+//   message: {
+//     error: "Too many requests from this IP, please try again later.",
+//     retryAfter: "15 minutes",
+//   },
+//   standardHeaders: true,
+//   legacyHeaders: false,
+// });
+// app.use("/api", limiter);
 
 // Logging middleware
 app.use(

@@ -61,7 +61,7 @@ const registerSchema = yup.object({
 });
 
 const LoginForm = () => {
-  console.log("[LoginForm] Component rendered");
+  // console.log("[LoginForm] Component rendered");
   const [isLogin, setIsLogin] = useState(true);
 
   // Debug: Log all submit events on the page

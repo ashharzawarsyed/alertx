@@ -185,16 +185,16 @@ export const updateBedAvailability = asyncHandler(async (req, res) => {
   }
 
   // Check permissions
-  if (userRole !== USER_ROLES.ADMIN && userRole !== USER_ROLES.HOSPITAL_STAFF) {
+  if (userRole !== USER_ROLES.ADMIN && userRole !== USER_ROLES.HOSPITAL) {
     return sendResponse(
       res,
       RESPONSE_CODES.FORBIDDEN,
-      "Only hospital staff can update bed availability"
+      "Only hospital admin can update bed availability"
     );
   }
 
-  // If hospital staff, check if they belong to this hospital
-  if (userRole === USER_ROLES.HOSPITAL_STAFF) {
+  // If hospital user, check if they belong to this hospital
+  if (userRole === USER_ROLES.HOSPITAL) {
     const user = await User.findById(userId);
     if (user.hospitalInfo.hospitalId.toString() !== hospitalId) {
       return sendResponse(
@@ -317,7 +317,7 @@ export const updateHospital = asyncHandler(async (req, res) => {
   }
 
   // Check permissions
-  if (userRole !== USER_ROLES.ADMIN && userRole !== USER_ROLES.HOSPITAL_STAFF) {
+  if (userRole !== USER_ROLES.ADMIN && userRole !== USER_ROLES.HOSPITAL) {
     return sendResponse(
       res,
       RESPONSE_CODES.FORBIDDEN,
@@ -325,8 +325,8 @@ export const updateHospital = asyncHandler(async (req, res) => {
     );
   }
 
-  // If hospital staff, check if they belong to this hospital
-  if (userRole === USER_ROLES.HOSPITAL_STAFF) {
+  // If hospital, check if they belong to this hospital
+  if (userRole === USER_ROLES.HOSPITAL) {
     const user = await User.findById(userId);
     if (user.hospitalInfo.hospitalId.toString() !== hospitalId) {
       return sendResponse(
@@ -384,7 +384,7 @@ export const getHospitalStats = asyncHandler(async (req, res) => {
   const userRole = req.user.role;
 
   // Check permissions
-  if (userRole !== USER_ROLES.ADMIN && userRole !== USER_ROLES.HOSPITAL_STAFF) {
+  if (userRole !== USER_ROLES.ADMIN && userRole !== USER_ROLES.HOSPITAL) {
     return sendResponse(
       res,
       RESPONSE_CODES.FORBIDDEN,
@@ -392,8 +392,8 @@ export const getHospitalStats = asyncHandler(async (req, res) => {
     );
   }
 
-  // If hospital staff, check if they belong to this hospital
-  if (userRole === USER_ROLES.HOSPITAL_STAFF) {
+  // If hospital, check if they belong to this hospital
+  if (userRole === USER_ROLES.HOSPITAL) {
     const user = await User.findById(userId);
     if (user.hospitalInfo.hospitalId.toString() !== hospitalId) {
       return sendResponse(

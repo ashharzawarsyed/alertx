@@ -10,6 +10,26 @@ const hospitalSchema = new mongoose.Schema(
       maxlength: [100, "Hospital name cannot exceed 100 characters"],
     },
 
+    type: {
+      type: String,
+      required: [true, "Hospital type is required"],
+      enum: [
+        "General Hospital",
+        "Specialty Hospital",
+        "Emergency Center",
+        "Urgent Care",
+        "Trauma Center",
+        "Children's Hospital",
+      ],
+    },
+
+    licenseNumber: {
+      type: String,
+      required: [true, "License number is required"],
+      unique: true,
+      trim: true,
+    },
+
     address: {
       type: String,
       required: [true, "Hospital address is required"],
@@ -21,13 +41,13 @@ const hospitalSchema = new mongoose.Schema(
     location: {
       lat: {
         type: Number,
-        required: [true, "Latitude is required"],
+        // required: [true, "Latitude is required"], // Temporarily optional
         min: [-90, "Invalid latitude"],
         max: [90, "Invalid latitude"],
       },
       lng: {
         type: Number,
-        required: [true, "Longitude is required"],
+        // required: [true, "Longitude is required"], // Temporarily optional
         min: [-180, "Invalid longitude"],
         max: [180, "Invalid longitude"],
       },
@@ -46,6 +66,15 @@ const hospitalSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
       match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Please provide a valid email"],
+    },
+
+    emergencyContact: {
+      type: String,
+      required: [true, "Emergency contact is required"],
+      match: [
+        /^\+[1-9]\d{1,14}$/,
+        "Please provide a valid emergency contact number",
+      ],
     },
 
     // Total bed capacity
@@ -198,7 +227,7 @@ const hospitalSchema = new mongoose.Schema(
 );
 
 // Index for geospatial queries
-hospitalSchema.index({ location: "2dsphere" });
+// hospitalSchema.index({ location: "2dsphere" }); // Temporarily disabled for testing
 
 // Virtual for total available beds
 hospitalSchema.virtual("totalAvailableBeds").get(function () {

@@ -70,12 +70,6 @@ export const validateUserRegistration = [
     .notEmpty()
     .withMessage("Ambulance number is required for drivers"),
 
-  // Conditional validation for hospital staff
-  body("hospitalInfo.hospitalId")
-    .if(body("role").equals(USER_ROLES.HOSPITAL_STAFF))
-    .isMongoId()
-    .withMessage("Valid hospital ID is required for hospital staff"),
-
   handleValidationErrors,
 ];
 
@@ -148,17 +142,127 @@ export const validateHospital = [
     .matches(/^\+[1-9]\d{1,14}$/)
     .withMessage("Please provide a valid contact number"),
 
+  body("email")
+    .isEmail()
+    .normalizeEmail()
+    .withMessage("Please provide a valid email"),
+
   body("totalBeds.general")
     .isInt({ min: 0 })
-    .withMessage("General beds must be a positive number"),
+    .withMessage("General beds must be a non-negative integer"),
 
   body("totalBeds.icu")
     .isInt({ min: 0 })
-    .withMessage("ICU beds must be a positive number"),
+    .withMessage("ICU beds must be a non-negative integer"),
 
   body("totalBeds.emergency")
     .isInt({ min: 0 })
-    .withMessage("Emergency beds must be a positive number"),
+    .withMessage("Emergency beds must be a non-negative integer"),
+
+  body("totalBeds.operation")
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage("Operation beds must be a non-negative integer"),
+
+  body("facilities")
+    .optional()
+    .isArray()
+    .withMessage("Facilities must be an array"),
+
+  body("operatingHours.isOpen24x7")
+    .optional()
+    .isBoolean()
+    .withMessage("isOpen24x7 must be a boolean"),
+
+  body("operatingHours.openTime")
+    .if(body("operatingHours.isOpen24x7").equals(false))
+    .notEmpty()
+    .withMessage("Open time is required when not open 24x7"),
+
+  body("operatingHours.closeTime")
+    .if(body("operatingHours.isOpen24x7").equals(false))
+    .notEmpty()
+    .withMessage("Close time is required when not open 24x7"),
+
+  handleValidationErrors,
+];
+
+/**
+ * Hospital registration with admin validation
+ */
+export const validateHospitalRegistration = [
+  // Hospital details
+  body("hospitalName")
+    .trim()
+    .isLength({ min: 2, max: 100 })
+    .withMessage("Hospital name must be between 2 and 100 characters"),
+
+  body("hospitalType").notEmpty().withMessage("Hospital type is required"),
+
+  body("licenseNumber").notEmpty().withMessage("License number is required"),
+
+  body("address")
+    .trim()
+    .isLength({ min: 10, max: 200 })
+    .withMessage("Address must be between 10 and 200 characters"),
+
+  body("city").notEmpty().withMessage("City is required"),
+
+  body("state").notEmpty().withMessage("State is required"),
+
+  body("zipCode").notEmpty().withMessage("ZIP code is required"),
+
+  body("country").notEmpty().withMessage("Country is required"),
+
+  body("latitude")
+    .optional()
+    .isFloat({ min: -90, max: 90 })
+    .withMessage("Valid latitude is required"),
+
+  body("longitude")
+    .optional()
+    .isFloat({ min: -180, max: 180 })
+    .withMessage("Valid longitude is required"),
+
+  body("contactNumber")
+    .matches(/^\+[1-9]\d{1,14}$/)
+    .withMessage("Please provide a valid contact number with country code"),
+
+  body("email")
+    .isEmail()
+    .normalizeEmail()
+    .withMessage("Please provide a valid email"),
+
+  body("totalBeds.general")
+    .isInt({ min: 0 })
+    .withMessage("General beds must be a non-negative integer"),
+
+  body("totalBeds.icu")
+    .isInt({ min: 0 })
+    .withMessage("ICU beds must be a non-negative integer"),
+
+  body("totalBeds.emergency")
+    .isInt({ min: 0 })
+    .withMessage("Emergency beds must be a non-negative integer"),
+
+  body("totalBeds.operation")
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage("Operation beds must be a non-negative integer"),
+
+  body("emergencyContact")
+    .matches(/^\+[1-9]\d{1,14}$/)
+    .withMessage(
+      "Please provide a valid emergency contact number with country code"
+    ),
+
+  body("password")
+    .isLength({ min: 8 })
+    .withMessage("Password must be at least 8 characters long")
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage(
+      "Password must contain at least one uppercase letter, one lowercase letter, and one number"
+    ),
 
   handleValidationErrors,
 ];

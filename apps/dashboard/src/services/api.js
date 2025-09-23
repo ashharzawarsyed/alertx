@@ -85,6 +85,11 @@ export const authAPI = {
     const response = await api.post("/api/v1/auth/refresh");
     return response.data;
   },
+
+  getPendingAdmins: async () => {
+    const response = await api.get("/api/v1/auth/admin/pending");
+    return response.data.data;
+  },
 };
 
 export default api;

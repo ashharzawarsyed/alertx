@@ -54,6 +54,7 @@ export const errorHandler = (err, req, res) => {
  * 404 Not Found handler
  */
 export const notFound = (req, res) => {
+  console.warn(`[404] Not Found: ${req.method} ${req.originalUrl}`);
   return sendResponse(
     res,
     RESPONSE_CODES.NOT_FOUND,

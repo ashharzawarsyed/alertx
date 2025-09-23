@@ -82,22 +82,22 @@ export const IncomingPatientCard = ({
 
   // Layout classes based on full width mode
   const containerClasses = isFullWidth
-    ? "bg-gradient-to-br from-white to-slate-50 rounded-xl border border-slate-200/60 shadow-sm h-full min-h-[200px] flex flex-col"
-    : "bg-gradient-to-br from-white to-slate-50 rounded-2xl border border-slate-200/60 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden";
+    ? "bg-gradient-to-br from-white to-slate-50 rounded-xl border border-slate-200/60 shadow-sm h-full min-h-[120px] flex flex-col"
+    : "bg-gradient-to-br from-white to-slate-50 rounded-2xl border border-slate-200/60 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden min-h-[120px]";
 
   const headerClasses = isFullWidth
-    ? "bg-gradient-to-r from-slate-50 to-white p-4 border-b border-slate-200 flex-shrink-0"
-    : "bg-gradient-to-r from-slate-50 to-white p-6 border-b border-slate-200";
+    ? "bg-gradient-to-r from-slate-50 to-white p-2 border-b border-slate-200 flex-shrink-0"
+    : "bg-gradient-to-r from-slate-50 to-white p-3 border-b border-slate-200";
 
-  const bodyClasses = isFullWidth ? "p-4 flex-1 flex flex-col" : "p-6";
+  const bodyClasses = isFullWidth ? "p-2 flex-1 flex flex-col" : "p-3";
 
   const vitalsGridClasses = isFullWidth
-    ? "grid grid-cols-2 md:grid-cols-4 gap-3"
-    : "grid grid-cols-2 md:grid-cols-4 gap-4";
+    ? "grid grid-cols-2 md:grid-cols-4 gap-2"
+    : "grid grid-cols-2 md:grid-cols-4 gap-2";
 
   const infoGridClasses = isFullWidth
-    ? "grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4"
-    : "grid grid-cols-1 md:grid-cols-2 gap-6";
+    ? "grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-2"
+    : "grid grid-cols-1 md:grid-cols-2 gap-3";
 
   return (
     <motion.div
@@ -109,42 +109,39 @@ export const IncomingPatientCard = ({
       {/* Header with Patient Info */}
       <div className={headerClasses}>
         <div
-          className={`flex items-start justify-between ${isFullWidth ? "mb-3" : "mb-4"}`}
+          className={`flex items-center justify-between ${isFullWidth ? "mb-2" : "mb-3"}`}
         >
-          <div className="flex items-start gap-4">
+          <div className="flex items-center gap-2">
             <div
-              className={`${isFullWidth ? "w-12 h-12" : "w-14 h-14"} bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg`}
+              className={`${isFullWidth ? "w-10 h-10" : "w-12 h-12"} bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg`}
             >
-              <User size={isFullWidth ? 20 : 24} />
+              <User size={isFullWidth ? 16 : 18} />
             </div>
             <div>
               <h3
-                className={`font-bold text-slate-800 ${isFullWidth ? "text-lg mb-1" : "text-xl mb-1"}`}
+                className={`font-bold text-slate-800 ${isFullWidth ? "text-base mb-0.5" : "text-lg mb-0.5"}`}
               >
                 {patientName}
               </h3>
               <p
-                className={`text-slate-600 ${isFullWidth ? "text-sm" : "text-sm"}`}
+                className={`text-slate-600 ${isFullWidth ? "text-xs" : "text-xs"}`}
               >
-                {patientAge} years old • {patientGender}
+                {patientAge} yrs • {patientGender}
               </p>
-              <div
-                className={`flex items-center gap-2 ${isFullWidth ? "mt-2" : "mt-2"}`}
-              >
-                <FirstAid size={14} className="text-red-500" />
-                <span className="font-medium text-slate-700 text-sm">
+              <div className="flex items-center gap-1 mt-1">
+                <FirstAid size={12} className="text-red-500" />
+                <span className="font-medium text-slate-700 text-xs">
                   {condition}
                 </span>
               </div>
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <PriorityBadge priority={priority} />
             <div
-              className={`flex items-center gap-2 px-2 py-1 rounded-lg font-medium text-sm ${arrivalBg} ${arrivalColor}`}
+              className={`flex items-center gap-1 px-1 py-0.5 rounded font-medium text-xs ${arrivalBg} ${arrivalColor}`}
             >
-              <Timer size={14} />
+              <Timer size={12} />
               <span>{arrivalMinutes} min</span>
             </div>
           </div>
@@ -166,52 +163,36 @@ export const IncomingPatientCard = ({
 
       {/* Body Content */}
       <div className={bodyClasses}>
-        {/* Vitals Grid */}
-        <div
-          className={`bg-gradient-to-r from-red-50 to-pink-50 rounded-lg p-3 mb-4 border border-red-100`}
-        >
-          <h4
-            className={`font-semibold text-red-700 mb-3 flex items-center gap-2 text-sm`}
-          >
-            <Heart size={16} className="text-red-500" />
-            Current Vitals
+        {/* Vitals Grid - compact, modern look */}
+        <div className="bg-gradient-to-r from-red-50 to-pink-50 rounded-lg p-2 mb-2 border border-red-100">
+          <h4 className="font-semibold text-red-700 mb-2 flex items-center gap-1 text-xs">
+            <Heart size={12} className="text-red-500" />
+            Vitals
           </h4>
           <div className={vitalsGridClasses}>
             <div className="text-center">
-              <p
-                className={`${isFullWidth ? "text-lg" : "text-2xl"} font-bold text-red-600`}
-              >
+              <p className="text-base font-bold text-red-600 mb-0.5">
                 {vitals?.heartRate || "N/A"}
               </p>
-              <p className={`text-red-500 text-xs font-medium`}>Heart Rate</p>
+              <p className="text-red-500 text-[10px] font-medium">HR</p>
             </div>
             <div className="text-center">
-              <p
-                className={`${isFullWidth ? "text-lg" : "text-2xl"} font-bold text-red-600`}
-              >
+              <p className="text-base font-bold text-red-600 mb-0.5">
                 {vitals?.bloodPressure || "N/A"}
               </p>
-              <p className={`text-red-500 text-xs font-medium`}>
-                Blood Pressure
-              </p>
+              <p className="text-red-500 text-[10px] font-medium">BP</p>
             </div>
             <div className="text-center">
-              <p
-                className={`${isFullWidth ? "text-lg" : "text-2xl"} font-bold text-red-600`}
-              >
+              <p className="text-base font-bold text-red-600 mb-0.5">
                 {vitals?.oxygenSaturation || "N/A"}
               </p>
-              <p className={`text-red-500 text-xs font-medium`}>
-                O2 Saturation
-              </p>
+              <p className="text-red-500 text-[10px] font-medium">O2</p>
             </div>
             <div className="text-center">
-              <p
-                className={`${isFullWidth ? "text-lg" : "text-2xl"} font-bold text-red-600`}
-              >
+              <p className="text-base font-bold text-red-600 mb-0.5">
                 {vitals?.temperature || "N/A"}
               </p>
-              <p className={`text-red-500 text-xs font-medium`}>Temperature</p>
+              <p className="text-red-500 text-[10px] font-medium">Temp</p>
             </div>
           </div>
         </div>

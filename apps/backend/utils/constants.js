@@ -2,7 +2,7 @@
 export const USER_ROLES = {
   PATIENT: "patient",
   DRIVER: "driver",
-  HOSPITAL_STAFF: "hospital_staff",
+  HOSPITAL: "hospital", // Direct hospital registration
   ADMIN: "admin",
 };
 
