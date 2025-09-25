@@ -169,10 +169,10 @@ export const login = asyncHandler(async (req, res) => {
       user.approvalStatus === "pending"
         ? "Account is pending approval. You'll receive an email once activated."
         : user.approvalStatus === "rejected"
-        ? `Account has been rejected. Reason: ${
-            user.rejectionReason || "Contact administrator"
-          }`
-        : "Account approval required";
+          ? `Account has been rejected. Reason: ${
+              user.rejectionReason || "Contact administrator"
+            }`
+          : "Account approval required";
 
     return sendResponse(res, RESPONSE_CODES.UNAUTHORIZED, message);
   }
@@ -183,11 +183,11 @@ export const login = asyncHandler(async (req, res) => {
       user.approvalStatus === "pending"
         ? "Your hospital registration is pending approval. You'll receive an email once your account is activated."
         : user.approvalStatus === "rejected"
-        ? `Your hospital registration has been rejected. Reason: ${
-            user.rejectionReason ||
-            "Please contact support for more information."
-          }`
-        : "Hospital approval required";
+          ? `Your hospital registration has been rejected. Reason: ${
+              user.rejectionReason ||
+              "Please contact support for more information."
+            }`
+          : "Hospital approval required";
 
     return sendResponse(res, RESPONSE_CODES.UNAUTHORIZED, message);
   }

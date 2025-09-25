@@ -88,7 +88,7 @@ const AuthPage = () => {
           </motion.div>
 
           {/* Right side - Auth Forms */}
-          <div className="w-full max-w-md mx-auto">
+          <div className="mx-auto w-full max-w-md">
             <AnimatePresence mode="wait">
               {isSignUp ? (
                 <motion.div

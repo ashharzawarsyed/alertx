@@ -1,4 +1,4 @@
-  {
+{
   "name": "alertx",
   "version": "1.0.0",
   "description": "Smart Ambulance Dispatch & Hospital Coordination System",
@@ -12,6 +12,10 @@
     "dashboard": "npm run start --workspace=dashboard",
     "hospital-dashboard": "npm run dev --workspace=hospital-dashboard",
     "ai-service": "npm run start --workspace=ai-service",
+    "emergency-user-app": "npm run start --workspace=emergency-user-app",
+    "emergency-driver-app": "npm run start --workspace=emergency-driver-app",
+    "user-app:expo": "cd apps/emergency-user-app && npx expo start",
+    "driver-app:expo": "cd apps/emergency-driver-app && npx expo start",
     "install-all": "npm install",
     "clean": "npm run clean --workspaces --if-present"
   },

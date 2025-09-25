@@ -11,7 +11,7 @@ async function approveAdmin() {
 
     // Find the admin user we just created
     const admin = await User.findOne({ email: "fdsjkahfdhasfhh@gmail.com" });
-    
+
     if (!admin) {
       console.log("Admin user not found");
       return;
@@ -27,7 +27,12 @@ async function approveAdmin() {
     await admin.save();
 
     console.log("Admin approved successfully!");
-    console.log("Updated status:", admin.approvalStatus, "Active:", admin.isActive);
+    console.log(
+      "Updated status:",
+      admin.approvalStatus,
+      "Active:",
+      admin.isActive
+    );
 
     process.exit(0);
   } catch (error) {

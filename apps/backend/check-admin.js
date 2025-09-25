@@ -11,7 +11,7 @@ async function checkAdmin() {
 
     // Find the admin user
     const admin = await User.findOne({ email: "fdsjkahfdhasfhh@gmail.com" });
-    
+
     if (!admin) {
       console.log("Admin user not found");
       return;
