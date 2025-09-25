@@ -13,7 +13,7 @@ const ControlsRedirect = () => {
 };
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { LoginPage } from "./features/auth";
+import { AuthPage } from "./features/auth";
 import DashboardLayout from "./shared/layouts/DashboardLayout";
 import AdminDashboard from "./pages/AdminDashboard";
 import HospitalManagement from "./features/hospitals/HospitalManagement";
@@ -81,7 +81,7 @@ function App() {
           <Routes>
             {/* Redirect /controls to /dashboard/controls */}
             <Route path="/controls" element={<ControlsRedirect />} />
-            <Route path="/login" element={<LoginPage />} />
+            <Route path="/login" element={<AuthPage />} />
             <Route
               path="/dashboard/*"
               element={

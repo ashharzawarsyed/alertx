@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -22,9 +22,10 @@ import {
 import { useAuth } from "../../../contexts/AuthContext";
 
 // Validation schemas
-const loginSchema = yup.object({
+const loginSchema = yup.object().shape({
   email: yup
     .string()
+    .trim()
     .email("Please enter a valid email")
     .required("Email is required"),
   password: yup
@@ -33,18 +34,21 @@ const loginSchema = yup.object({
     .required("Password is required"),
 });
 
-const registerSchema = yup.object({
+const registerSchema = yup.object().shape({
   name: yup
     .string()
+    .trim()
     .min(2, "Name must be at least 2 characters")
     .max(50, "Name cannot exceed 50 characters")
     .required("Name is required"),
   email: yup
     .string()
+    .trim()
     .email("Please enter a valid email")
     .required("Email is required"),
   phone: yup
     .string()
+    .trim()
     .matches(
       /^\+[1-9]\d{1,14}$/,
       "Please provide a valid phone number with country code (e.g., +1234567890)",
@@ -53,65 +57,85 @@ const registerSchema = yup.object({
   password: yup
     .string()
     .min(8, "Password must be at least 8 characters")
+    .matches(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+      "Password must contain at least one uppercase letter, one lowercase letter, and one number",
+    )
     .required("Password is required"),
   confirmPassword: yup
     .string()
-    .oneOf([yup.ref("password")], "Passwords must match")
-    .required("Please confirm your password"),
+    .required("Please confirm your password")
+    .oneOf([yup.ref("password")], "Passwords must match"),
 });
 
 const LoginForm = () => {
   // console.log("[LoginForm] Component rendered");
   const [isLogin, setIsLogin] = useState(true);
 
-  // Debug: Log all submit events on the page
-  useEffect(() => {
-    const handler = (e) => {
-      console.log("[Global Submit Event]", e.target);
-    };
-    window.addEventListener("submit", handler, true);
-    return () => window.removeEventListener("submit", handler, true);
-  }, []);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    password: "",
-    confirmPassword: "",
-  });
-  const { login, register: registerUser } = useAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
+  // Remove formKey state as it causes form remounting during submission
 
-  // Handle form field changes
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+  // React Hook Form setup with memoized schema
+  const currentSchema = useMemo(
+    () => (isLogin ? loginSchema : registerSchema),
+    [isLogin],
+  );
 
-  // Clear form when switching modes
-  useEffect(() => {
-    setFormData({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    setError,
+    clearErrors,
+  } = useForm({
+    resolver: yupResolver(currentSchema),
+    mode: "onSubmit",
+    reValidateMode: "onSubmit", // Changed from onBlur to onSubmit
+    criteriaMode: "firstError",
+    shouldFocusError: true,
+    defaultValues: {
       name: "",
       email: "",
       phone: "",
       password: "",
       confirmPassword: "",
-    });
-    setMessage(null);
-  }, [isLogin]);
+    },
+  });
 
-  const onSubmit = async (e) => {
-    console.log("[LoginForm] onSubmit called", e);
-    if (e && typeof e.preventDefault === "function") {
-      e.preventDefault();
-      e.stopPropagation();
-    }
+  const { login, register: registerUser } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Clear form when switching modes (only when isLogin actually changes)
+  const clearFormData = useCallback(() => {
+    reset(
+      {
+        name: "",
+        email: "",
+        phone: "",
+        password: "",
+        confirmPassword: "",
+      },
+      {
+        keepErrors: false,
+        keepDirty: false,
+        keepIsSubmitted: false,
+        keepTouched: false,
+        keepIsValid: false,
+        keepSubmitCount: false,
+      },
+    );
+    clearErrors();
+    setMessage(null);
+  }, [reset, clearErrors]);
+
+  useEffect(() => {
+    clearFormData();
+  }, [isLogin, clearFormData]);
+
+  const onSubmit = async (formData) => {
     setIsLoading(true);
     setMessage(null);
 
@@ -141,24 +165,49 @@ const LoginForm = () => {
             type: "success",
             text: result.message || "Registration submitted successfully!",
           });
-          setFormData({
-            name: "",
-            email: "",
-            phone: "",
-            password: "",
-            confirmPassword: "",
-          });
+          // Reset form completely including submission state for successful registration
+          reset(
+            {
+              name: "",
+              email: "",
+              phone: "",
+              password: "",
+              confirmPassword: "",
+            },
+            {
+              keepErrors: false,
+              keepDirty: false,
+              keepIsSubmitted: false,
+              keepTouched: false,
+              keepIsValid: false,
+              keepSubmitCount: false,
+            },
+          );
         }
       } else {
-        setMessage({
-          type: "error",
-          text: result.error || "An error occurred",
-        });
+        // Handle backend field validation errors
+        if (result.fieldErrors) {
+          // Set individual field errors
+          Object.entries(result.fieldErrors).forEach(
+            ([field, fieldErrorArray]) => {
+              setError(field, {
+                type: "server",
+                message: fieldErrorArray[0], // Use first error for the field
+              });
+            },
+          );
+        } else {
+          // Fallback to general error message
+          setMessage({
+            type: "error",
+            text: result.error || "An error occurred",
+          });
+        }
       }
     } catch (error) {
       setMessage({
         type: "error",
-        text: "An unexpected error occurred",
+        text: error?.message || "An unexpected error occurred",
       });
     } finally {
       setIsLoading(false);
@@ -168,13 +217,24 @@ const LoginForm = () => {
   const toggleMode = () => {
     setIsLogin(!isLogin);
     setMessage(null);
-    setFormData({
-      name: "",
-      email: "",
-      phone: "",
-      password: "",
-      confirmPassword: "",
-    });
+    reset(
+      {
+        name: "",
+        email: "",
+        phone: "",
+        password: "",
+        confirmPassword: "",
+      },
+      {
+        keepErrors: false,
+        keepDirty: false,
+        keepIsSubmitted: false,
+        keepTouched: false,
+        keepIsValid: false,
+        keepSubmitCount: false,
+      },
+    );
+    clearErrors();
   };
 
   return (
@@ -264,7 +324,11 @@ const LoginForm = () => {
             }
             className="mx-auto w-full max-w-md"
           >
-            <form onSubmit={onSubmit} className="space-y-6">
+            <form
+              key={isLogin ? "login" : "register"} // Only remount when switching modes
+              onSubmit={handleSubmit(onSubmit)}
+              className="space-y-6"
+            >
               {/* Message display */}
               {message && (
                 <motion.div
@@ -281,9 +345,41 @@ const LoginForm = () => {
                   ) : (
                     <AlertCircle className="h-5 w-5" />
                   )}
-                  <span className="font-sans text-sm font-medium">
-                    {message.text}
-                  </span>
+                  <div className="flex-1">
+                    <span className="font-sans text-sm font-medium">
+                      {message.text}
+                    </span>
+                    {message.type === "success" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMessage(null);
+                          // Reset form for another registration attempt
+                          reset(
+                            {
+                              name: "",
+                              email: "",
+                              phone: "",
+                              password: "",
+                              confirmPassword: "",
+                            },
+                            {
+                              keepErrors: false,
+                              keepDirty: false,
+                              keepIsSubmitted: false,
+                              keepTouched: false,
+                              keepIsValid: false,
+                              keepSubmitCount: false,
+                            },
+                          );
+                          clearErrors();
+                        }}
+                        className="ml-2 text-xs text-green-600 underline hover:text-green-700"
+                      >
+                        Submit Another Application
+                      </button>
+                    )}
+                  </div>
                 </motion.div>
               )}
               <AnimatePresence mode="wait">
@@ -300,9 +396,8 @@ const LoginForm = () => {
                       type="text"
                       placeholder="Enter your full name"
                       icon={User}
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
+                      error={errors.name?.message}
+                      {...register("name")}
                     />
                   </motion.div>
                 )}
@@ -313,9 +408,8 @@ const LoginForm = () => {
                 type="email"
                 placeholder="admin@alertx.com"
                 icon={Mail}
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
+                error={errors.email?.message}
+                {...register("email")}
               />
 
               <AnimatePresence mode="wait">
@@ -332,9 +426,8 @@ const LoginForm = () => {
                       type="tel"
                       placeholder="+1234567890"
                       icon={Phone}
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
+                      error={errors.phone?.message}
+                      {...register("phone")}
                     />
                   </motion.div>
                 )}
@@ -346,15 +439,15 @@ const LoginForm = () => {
                   type="password"
                   placeholder="Enter your password"
                   icon={Lock}
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
+                  error={errors.password?.message}
+                  {...register("password")}
                 />
                 {!isLogin && (
                   <div className="rounded-lg bg-blue-50 p-3">
                     <p className="text-xs text-blue-700">
                       <strong>Password Requirements:</strong>
-                      At least 8 characters
+                      At least 8 characters, one uppercase, one lowercase, and
+                      one number
                     </p>
                   </div>
                 )}
@@ -374,9 +467,8 @@ const LoginForm = () => {
                       type="password"
                       placeholder="Confirm your password"
                       icon={Lock}
-                      name="confirmPassword"
-                      value={formData.confirmPassword}
-                      onChange={handleChange}
+                      error={errors.confirmPassword?.message}
+                      {...register("confirmPassword")}
                     />
                   </motion.div>
                 )}

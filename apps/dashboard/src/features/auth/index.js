@@ -1,2 +1,2 @@
-export { default as LoginForm } from "./components/LoginForm";
-export { LoginPage } from "./pages";
+export { SignInForm, SignUpForm } from "./components/Index";
+export { LoginPage, AuthPage } from "./pages";

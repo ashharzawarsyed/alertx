@@ -1,9 +1,9 @@
 import React from "react";
-import LoginForm from "../components/LoginForm";
+import AuthPage from "./AuthPage";
 
 const LoginPage = () => {
-  console.log("[LoginPage] Rendered");
-  return <LoginForm />;
+  console.log("[LoginPage] Rendered - using AuthPage");
+  return <AuthPage />;
 };
 
 export default LoginPage;

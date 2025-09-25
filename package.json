@@ -9,8 +9,6 @@
   ],
   "scripts": {
     "backend": "npm run start --workspace=backend",
-    "user-app": "npm run start --workspace=user-app",
-    "driver-app": "npm run start --workspace=driver-app",
     "dashboard": "npm run start --workspace=dashboard",
     "hospital-dashboard": "npm run dev --workspace=hospital-dashboard",
     "ai-service": "npm run start --workspace=ai-service",
