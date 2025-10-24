@@ -15,6 +15,7 @@ import {
   sendAdminApprovalConfirmation,
   sendHospitalRegistrationConfirmation,
   sendHospitalApprovalRequest,
+  sendRegistrationOTP,
 } from "../services/emailService.js";
 
 export const register = asyncHandler(async (req, res) => {
@@ -663,4 +664,181 @@ export const registerHospital = asyncHandler(async (req, res) => {
       },
     }
   );
+});
+
+// Send OTP for email verification during registration
+export const requestRegistrationOTP = asyncHandler(async (req, res) => {
+  const { email, name } = req.body;
+
+  // Check if user already exists
+  const existingUser = await User.findOne({ email });
+  if (existingUser && existingUser.emailVerified) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.CONFLICT,
+      "User already exists with this email"
+    );
+  }
+
+  // Generate OTP
+  const otp = generateOTP(6);
+  const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+  try {
+    // Send OTP email
+    await sendRegistrationOTP({
+      name: name || "User",
+      email,
+      otp,
+    });
+
+    // Store OTP temporarily (either create temp user or update existing unverified user)
+    if (existingUser && !existingUser.emailVerified) {
+      existingUser.emailVerificationOTP = otp;
+      existingUser.emailVerificationOTPExpires = otpExpires;
+      await existingUser.save();
+    } else {
+      // Create a temporary user record to store OTP
+      await User.findOneAndUpdate(
+        { email },
+        {
+          email,
+          name: name || "User",
+          emailVerificationOTP: otp,
+          emailVerificationOTPExpires: otpExpires,
+          emailVerified: false,
+          // Set temporary values for required fields
+          password: "temp", // Will be replaced during actual registration
+          phone: "temp", // Will be replaced during actual registration
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    sendResponse(
+      res,
+      RESPONSE_CODES.SUCCESS,
+      "OTP sent to your email successfully",
+      {
+        message: "Please check your email for the verification code",
+        email,
+      }
+    );
+  } catch (error) {
+    console.error("Error sending OTP:", error);
+    sendResponse(
+      res,
+      RESPONSE_CODES.SERVER_ERROR,
+      "Failed to send verification email"
+    );
+  }
+});
+
+// Verify OTP and complete registration
+export const verifyOTPAndRegister = asyncHandler(async (req, res) => {
+  const {
+    email,
+    otp,
+    name,
+    phone,
+    password,
+    role,
+    location,
+    notifiers,
+    emergencyContacts,
+    medicalProfile,
+    address,
+  } = req.body;
+
+  // Find user with matching email and OTP
+  const user = await User.findOne({
+    email,
+    emailVerificationOTP: otp,
+    emailVerificationOTPExpires: { $gt: new Date() },
+  }).select("+emailVerificationOTP +emailVerificationOTPExpires");
+
+  if (!user) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.BAD_REQUEST,
+      "Invalid or expired OTP"
+    );
+  }
+
+  // Check if user already exists and is verified
+  const existingVerifiedUser = await User.findOne({
+    $or: [{ email }, { phone }],
+    emailVerified: true,
+  });
+
+  if (existingVerifiedUser) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.CONFLICT,
+      "User already exists with this email or phone"
+    );
+  }
+
+  try {
+    // Update user with complete registration data
+    const userData = {
+      name,
+      phone,
+      password,
+      role: role || USER_ROLES.PATIENT,
+      emailVerified: true,
+      emailVerificationOTP: undefined,
+      emailVerificationOTPExpires: undefined,
+    };
+
+    // Add role-specific data
+    if (role === USER_ROLES.PATIENT) {
+      if (location) userData.location = location;
+      if (notifiers) userData.notifiers = notifiers;
+      if (emergencyContacts) userData.emergencyContacts = emergencyContacts;
+      if (address) userData.address = address;
+      if (medicalProfile) userData.medicalProfile = medicalProfile;
+    }
+
+    if (role === USER_ROLES.DRIVER) {
+      const { driverInfo } = req.body;
+      if (driverInfo) {
+        userData.driverInfo = {
+          ...driverInfo,
+          status: "offline",
+        };
+      }
+    }
+
+    // Update the user
+    Object.assign(user, userData);
+    await user.save();
+
+    // Generate token
+    const token = generateToken(user._id);
+
+    sendResponse(
+      res,
+      RESPONSE_CODES.CREATED,
+      "Registration completed successfully",
+      {
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          emailVerified: user.emailVerified,
+        },
+      }
+    );
+  } catch (error) {
+    console.error("Registration error:", error);
+    sendResponse(
+      res,
+      RESPONSE_CODES.SERVER_ERROR,
+      "Registration failed. Please try again."
+    );
+  }
 });

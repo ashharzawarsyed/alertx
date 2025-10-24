@@ -368,3 +368,102 @@ export const validateUpdateProfile = [
 
   handleValidationErrors,
 ];
+
+/**
+ * OTP request validation
+ */
+export const validateOTPRequest = [
+  body("email")
+    .isEmail()
+    .normalizeEmail()
+    .withMessage("Please provide a valid email"),
+
+  body("name")
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage("Name must be between 2 and 50 characters"),
+
+  handleValidationErrors,
+];
+
+/**
+ * OTP verification and registration validation
+ */
+export const validateOTPVerification = [
+  body("email")
+    .isEmail()
+    .normalizeEmail()
+    .withMessage("Please provide a valid email"),
+
+  body("otp")
+    .isLength({ min: 6, max: 6 })
+    .isNumeric()
+    .withMessage("OTP must be a 6-digit number"),
+
+  body("name")
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage("Name must be between 2 and 50 characters"),
+
+  body("phone")
+    .matches(/^\+[1-9]\d{1,14}$/)
+    .withMessage("Please provide a valid phone number with country code"),
+
+  body("password")
+    .isLength({ min: 8 })
+    .withMessage("Password must be at least 8 characters long")
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage(
+      "Password must contain at least one uppercase letter, one lowercase letter, and one number"
+    ),
+
+  body("role")
+    .optional()
+    .isIn(Object.values(USER_ROLES))
+    .withMessage("Invalid user role"),
+
+  // Location validation for patients
+  body("location.lat")
+    .optional()
+    .isFloat({ min: -90, max: 90 })
+    .withMessage("Invalid latitude"),
+
+  body("location.lng")
+    .optional()
+    .isFloat({ min: -180, max: 180 })
+    .withMessage("Invalid longitude"),
+
+  // Address validation
+  body("address.street")
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage("Street address must be between 1 and 100 characters"),
+
+  body("address.city")
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 50 })
+    .withMessage("City must be between 1 and 50 characters"),
+
+  body("address.state")
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 50 })
+    .withMessage("State must be between 1 and 50 characters"),
+
+  body("address.zipCode")
+    .optional()
+    .trim()
+    .isLength({ min: 5, max: 10 })
+    .withMessage("Zip code must be between 5 and 10 characters"),
+
+  body("address.country")
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 50 })
+    .withMessage("Country must be between 1 and 50 characters"),
+
+  handleValidationErrors,
+];

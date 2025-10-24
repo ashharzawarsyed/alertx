@@ -4,14 +4,15 @@ import mongoose from "mongoose";
 
 const PORT = process.env.PORT || 5000;
 
-// Start server
-const server = app.listen(PORT, () => {
+// Start server - listen on all interfaces for emulator connectivity
+const server = app.listen(PORT, "0.0.0.0", () => {
   console.log(`
   🚀 AlertX Backend Server Started
   📍 Environment: ${process.env.NODE_ENV}
   🌐 Port: ${PORT}
   📱 API: http://localhost:${PORT}
   📊 Health: http://localhost:${PORT}/
+  🔗 Emulator: http://10.0.2.2:${PORT}
   `);
 });
 

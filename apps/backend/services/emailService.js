@@ -553,6 +553,55 @@ export const sendHospitalApprovalConfirmation = async (
   }
 };
 
+// Send OTP verification email for registration
+export const sendRegistrationOTP = async (userData) => {
+  try {
+    const transporter = createTransporter();
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || "noreply@alertx.com",
+      to: userData.email,
+      subject: "📧 Email Verification - Your OTP Code",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #3B82F6, #1D4ED8); padding: 30px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">🔐 Email Verification</h1>
+            <p style="color: white; margin: 10px 0 0 0; opacity: 0.9;">Secure Emergency Response System</p>
+          </div>
+          <div style="padding: 30px; background: #f8fafc;">
+            <h2 style="color: #1e293b; margin-bottom: 20px;">Hello ${userData.name},</h2>
+            <p style="color: #475569; line-height: 1.6; margin-bottom: 20px;">
+              To complete your registration for our emergency response system, please verify your email address using the code below:
+            </p>
+            <div style="background: #3B82F6; border-radius: 12px; padding: 25px; margin: 25px 0; text-align: center;">
+              <p style="color: white; margin: 0 0 10px 0; font-size: 16px;">Your Verification Code:</p>
+              <div style="font-size: 36px; font-weight: bold; color: white; letter-spacing: 6px; font-family: 'Courier New', monospace;">
+                ${userData.otp}
+              </div>
+            </div>
+            <div style="background: #fef3c7; border-radius: 8px; padding: 15px; margin: 20px 0;">
+              <p style="margin: 0; color: #92400e; font-weight: 500;">
+                ⚠️ This code expires in 10 minutes for security purposes.
+              </p>
+            </div>
+            <p style="color: #64748b; font-size: 14px; line-height: 1.6;">
+              If you didn't request this verification, please ignore this email.
+            </p>
+          </div>
+          <div style="background: #e2e8f0; padding: 20px; text-align: center; color: #64748b; font-size: 12px;">
+            <p style="margin: 0;">Emergency Response System - Secure Verification</p>
+            <p style="margin: 5px 0 0 0;">This is an automated message. Please do not reply to this email.</p>
+          </div>
+        </div>
+      `,
+    };
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ OTP verification email sent to: ${userData.email}`);
+  } catch (error) {
+    console.error(`❌ Failed to send OTP email to ${userData.email}:`, error);
+    throw error;
+  }
+};
+
 export default {
   sendAdminApprovalRequest,
   sendAdminApprovalConfirmation,
@@ -560,4 +609,5 @@ export default {
   sendHospitalRegistrationConfirmation,
   sendHospitalApprovalRequest,
   sendHospitalApprovalConfirmation,
+  sendRegistrationOTP,
 };

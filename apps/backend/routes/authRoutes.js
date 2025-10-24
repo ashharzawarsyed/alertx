@@ -11,6 +11,8 @@ import {
   getPendingAdmins,
   approveAdmin,
   registerHospital,
+  requestRegistrationOTP,
+  verifyOTPAndRegister,
 } from "../controllers/authController.js";
 import {
   validateUserRegistration,
@@ -20,6 +22,8 @@ import {
   validateResetPassword,
   validateUpdateProfile,
   validateHospitalRegistration,
+  validateOTPRequest,
+  validateOTPVerification,
 } from "../middlewares/validation.js";
 import { authenticate } from "../middlewares/auth.js";
 
@@ -31,6 +35,28 @@ const router = express.Router();
  * @access  Public
  */
 router.post("/register", validateUserRegistration, register);
+
+/**
+ * @route   POST /api/v1/auth/register/otp/request
+ * @desc    Request OTP for email verification during registration
+ * @access  Public
+ */
+router.post(
+  "/register/otp/request",
+  validateOTPRequest,
+  requestRegistrationOTP
+);
+
+/**
+ * @route   POST /api/v1/auth/register/otp/verify
+ * @desc    Verify OTP and complete user registration
+ * @access  Public
+ */
+router.post(
+  "/register/otp/verify",
+  validateOTPVerification,
+  verifyOTPAndRegister
+);
 
 /**
  * @route   POST /api/v1/auth/register/hospital
