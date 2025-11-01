@@ -12,6 +12,7 @@ import {
   approveAdmin,
   registerHospital,
   requestRegistrationOTP,
+  validateRegistrationOTP,
   verifyOTPAndRegister,
 } from "../controllers/authController.js";
 import {
@@ -23,6 +24,7 @@ import {
   validateUpdateProfile,
   validateHospitalRegistration,
   validateOTPRequest,
+  validateOTPCode,
   validateOTPVerification,
 } from "../middlewares/validation.js";
 import { authenticate } from "../middlewares/auth.js";
@@ -46,6 +48,8 @@ router.post(
   validateOTPRequest,
   requestRegistrationOTP
 );
+
+router.post("/register/otp/validate", validateOTPCode, validateRegistrationOTP);
 
 /**
  * @route   POST /api/v1/auth/register/otp/verify

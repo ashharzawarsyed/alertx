@@ -699,6 +699,8 @@ export const requestRegistrationOTP = asyncHandler(async (req, res) => {
       await existingUser.save();
     } else {
       // Create a temporary user record to store OTP
+      // Use email-based unique temp phone to avoid duplicates
+      const tempPhone = `+temp${Date.now()}`;
       await User.findOneAndUpdate(
         { email },
         {
@@ -709,7 +711,7 @@ export const requestRegistrationOTP = asyncHandler(async (req, res) => {
           emailVerified: false,
           // Set temporary values for required fields
           password: "temp", // Will be replaced during actual registration
-          phone: "temp", // Will be replaced during actual registration
+          phone: tempPhone, // Unique temporary phone to avoid duplicate key errors
         },
         { upsert: true, new: true }
       );
@@ -732,6 +734,29 @@ export const requestRegistrationOTP = asyncHandler(async (req, res) => {
       "Failed to send verification email"
     );
   }
+});
+
+// Validate registration OTP without completing registration
+export const validateRegistrationOTP = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+
+  const user = await User.findOne({
+    email,
+    emailVerificationOTP: otp,
+    emailVerificationOTPExpires: { $gt: new Date() },
+  }).select("+emailVerificationOTP +emailVerificationOTPExpires");
+
+  if (!user) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.BAD_REQUEST,
+      "Invalid or expired OTP"
+    );
+  }
+
+  sendResponse(res, RESPONSE_CODES.SUCCESS, "OTP verified successfully", {
+    email,
+  });
 });
 
 // Verify OTP and complete registration
