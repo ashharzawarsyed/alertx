@@ -32,7 +32,8 @@ coverage/
 .env.production.local
 
 # IDEs and editors
-.vscode/
+# Allow .vscode in project roots for shared team settings
+# .vscode/ # Commented out - team needs shared workspace settings
 .idea/
 *.swp
 *.swo
