@@ -1,0 +1,702 @@
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+  ActivityIndicator,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+
+import { MedicalInfoCard } from "../../components/medical/MedicalInfoCard";
+import { AllergyBadge } from "../../components/medical/AllergyBadge";
+import { MedicationItem } from "../../components/medical/MedicationItem";
+import {
+  medicalProfileService,
+  type MedicalProfile,
+} from "../../services/medicalProfileService";
+
+export default function MedicalProfileScreen() {
+  const router = useRouter();
+
+  const getCompletionPercentage = (): number => {
+    if (!profile?.profileCompletion) return 0;
+    const items = [
+      profile.profileCompletion.basicInfo,
+      profile.profileCompletion.medicalHistory,
+      profile.profileCompletion.emergencyContacts,
+    ];
+    const completed = items.filter(Boolean).length;
+    return Math.round((completed / items.length) * 100);
+  };
+  const [profile, setProfile] = useState<MedicalProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchProfile = useCallback(async () => {
+    try {
+      const response = await medicalProfileService.getMedicalProfile();
+      if (response.success && response.data) {
+        setProfile(response.data);
+      }
+    } catch (error) {
+      console.error("Error fetching medical profile:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchProfile();
+    setRefreshing(false);
+  };
+
+  const calculateAge = (dateOfBirth?: string): number | null => {
+    if (!dateOfBirth) return null;
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ) {
+      age--;
+    }
+    return age;
+  };
+
+  const getHeightString = (height?: {
+    feet: number;
+    inches: number;
+  }): string => {
+    if (!height) return "Not set";
+    return `${height.feet}' ${height.inches}"`;
+  };
+
+  const getWeightString = (weight?: {
+    value: number;
+    unit: string;
+  }): string => {
+    if (!weight) return "Not set";
+    return `${weight.value} ${weight.unit}`;
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#EF4444" />
+        <Text style={styles.loadingText}>Loading medical profile...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      {/* Modern Top Bar */}
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
+          <Ionicons name="arrow-back" size={24} color="#111827" />
+        </TouchableOpacity>
+        <View style={styles.topBarCenter}>
+          <Text style={styles.topBarTitle}>Medical Profile</Text>
+          <Text style={styles.topBarSubtitle}>Your health information</Text>
+        </View>
+        <TouchableOpacity style={styles.iconButton}>
+          <Ionicons name="share-outline" size={22} color="#111827" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {/* Profile Completion Banner */}
+        <View style={styles.completionBanner}>
+          <View style={styles.completionHeader}>
+            <View style={styles.completionIconContainer}>
+              <Ionicons name="checkmark-circle" size={24} color="#10B981" />
+            </View>
+            <View style={styles.completionInfo}>
+              <Text style={styles.completionTitle}>Profile Completion</Text>
+              <Text style={styles.completionSubtitle}>
+                {getCompletionPercentage()}% Complete
+              </Text>
+            </View>
+          </View>
+          <View style={styles.progressBar}>
+            <View
+              style={[
+                styles.progressFill,
+                { width: `${getCompletionPercentage()}%` },
+              ]}
+            />
+          </View>
+        </View>
+
+        {/* Quick Stats Grid */}
+        <View style={styles.statsGrid}>
+          <View style={[styles.statCard, { backgroundColor: "#FEE2E2" }]}>
+            <View style={styles.statIconContainer}>
+              <Ionicons name="water" size={20} color="#EF4444" />
+            </View>
+            <Text style={styles.statValue}>{profile?.bloodType || "—"}</Text>
+            <Text style={styles.statLabel}>Blood Type</Text>
+          </View>
+
+          <View style={[styles.statCard, { backgroundColor: "#DBEAFE" }]}>
+            <View style={styles.statIconContainer}>
+              <Ionicons name="calendar" size={20} color="#3B82F6" />
+            </View>
+            <Text style={styles.statValue}>
+              {calculateAge(profile?.dateOfBirth)}
+            </Text>
+            <Text style={styles.statLabel}>Age</Text>
+          </View>
+
+          <View style={[styles.statCard, { backgroundColor: "#FEF3C7" }]}>
+            <View style={styles.statIconContainer}>
+              <Ionicons name="resize" size={20} color="#F59E0B" />
+            </View>
+            <Text style={styles.statValue}>
+              {getHeightString(profile?.height)}
+            </Text>
+            <Text style={styles.statLabel}>Height</Text>
+          </View>
+
+          <View style={[styles.statCard, { backgroundColor: "#D1FAE5" }]}>
+            <View style={styles.statIconContainer}>
+              <Ionicons name="speedometer" size={20} color="#10B981" />
+            </View>
+            <Text style={styles.statValue}>
+              {getWeightString(profile?.weight)}
+            </Text>
+            <Text style={styles.statLabel}>Weight</Text>
+          </View>
+        </View>
+
+        {/* Allergies */}
+        <MedicalInfoCard
+          title="Allergies"
+          icon="alert-circle"
+          iconColor="#F59E0B"
+          onEdit={() => router.push("/medical/allergies")}
+          isEmpty={!profile?.allergies || profile.allergies.length === 0}
+          emptyMessage="No allergies recorded. Add any known allergies."
+        >
+          {profile?.allergies?.map((allergy, index) => (
+            <AllergyBadge
+              key={index}
+              allergen={allergy.allergen}
+              severity={allergy.severity}
+              reaction={allergy.reaction}
+              onPress={() => router.push("/medical/allergies")}
+            />
+          ))}
+        </MedicalInfoCard>
+
+        {/* Current Medications */}
+        <MedicalInfoCard
+          title="Current Medications"
+          icon="medical"
+          iconColor="#10B981"
+          onEdit={() => router.push("/medical/medications")}
+          isEmpty={
+            !profile?.medications ||
+            profile.medications.filter((m) => m.isActive).length === 0
+          }
+          emptyMessage="No active medications. Add your current medications."
+        >
+          {profile?.medications
+            ?.filter((med) => med.isActive)
+            .map((medication, index) => (
+              <MedicationItem
+                key={index}
+                name={medication.name}
+                dosage={medication.dosage}
+                frequency={medication.frequency}
+                isActive={medication.isActive}
+                onPress={() => router.push("/medical/medications")}
+              />
+            ))}
+        </MedicalInfoCard>
+
+        {/* Medical Conditions */}
+        <MedicalInfoCard
+          title="Medical Conditions"
+          icon="fitness"
+          iconColor="#8B5CF6"
+          onEdit={() => router.push("/medical/conditions")}
+          isEmpty={
+            !profile?.medicalConditions ||
+            profile.medicalConditions.length === 0
+          }
+          emptyMessage="No medical conditions recorded."
+        >
+          {profile?.medicalConditions?.map((condition, index) => (
+            <View key={index} style={styles.conditionItem}>
+              <View style={styles.conditionHeader}>
+                <Text style={styles.conditionName}>{condition.condition}</Text>
+                {condition.severity && (
+                  <View
+                    style={[
+                      styles.severityBadge,
+                      {
+                        backgroundColor:
+                          condition.severity === "severe"
+                            ? "#FEE2E2"
+                            : condition.severity === "moderate"
+                              ? "#FED7AA"
+                              : "#FEF3C7",
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.severityText,
+                        {
+                          color:
+                            condition.severity === "severe"
+                              ? "#991B1B"
+                              : condition.severity === "moderate"
+                                ? "#9A3412"
+                                : "#92400E",
+                        },
+                      ]}
+                    >
+                      {condition.severity.toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              {condition.diagnosedDate && (
+                <Text style={styles.conditionDate}>
+                  Diagnosed:{" "}
+                  {new Date(condition.diagnosedDate).toLocaleDateString()}
+                </Text>
+              )}
+            </View>
+          ))}
+        </MedicalInfoCard>
+
+        {/* Emergency Contacts */}
+        <MedicalInfoCard
+          title="Emergency Contacts"
+          icon="call"
+          iconColor="#EF4444"
+          onEdit={() => router.push("/medical/emergency-contacts")}
+          isEmpty={
+            !profile?.emergencyContacts ||
+            profile.emergencyContacts.length === 0
+          }
+          emptyMessage="Add emergency contacts for quick notification."
+        >
+          {profile?.emergencyContacts?.map((contact, index) => (
+            <View key={index} style={styles.contactItem}>
+              <View style={styles.contactAvatar}>
+                <Text style={styles.contactInitials}>
+                  {contact.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.contactInfo}>
+                <View style={styles.contactHeader}>
+                  <Text style={styles.contactName}>{contact.name}</Text>
+                  {contact.isPrimary && (
+                    <View style={styles.primaryBadge}>
+                      <Text style={styles.primaryText}>PRIMARY</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.contactRelationship}>
+                  {contact.relationship}
+                </Text>
+                <Text style={styles.contactPhone}>{contact.phone}</Text>
+              </View>
+              <TouchableOpacity style={styles.callButton}>
+                <Ionicons name="call" size={20} color="#10B981" />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </MedicalInfoCard>
+
+        {/* Surgeries */}
+        {profile?.surgeries && profile.surgeries.length > 0 && (
+          <MedicalInfoCard
+            title="Surgical History"
+            icon="cut"
+            iconColor="#EC4899"
+            onEdit={() => router.push("/medical/surgeries" as any)}
+          >
+            {profile.surgeries.map((surgery, index) => (
+              <View key={index} style={styles.surgeryItem}>
+                <Text style={styles.surgeryName}>{surgery.procedure}</Text>
+                {surgery.date && (
+                  <Text style={styles.surgeryDate}>
+                    {new Date(surgery.date).toLocaleDateString()}
+                  </Text>
+                )}
+                {surgery.hospital && (
+                  <Text style={styles.surgeryHospital}>{surgery.hospital}</Text>
+                )}
+              </View>
+            ))}
+          </MedicalInfoCard>
+        )}
+
+        {/* Healthcare Providers */}
+        {profile?.healthcareProviders &&
+          profile.healthcareProviders.length > 0 && (
+            <MedicalInfoCard
+              title="Healthcare Providers"
+              icon="people"
+              iconColor="#6366F1"
+              onEdit={() => router.push("/medical/providers" as any)}
+            >
+              {profile.healthcareProviders.map((provider, index) => (
+                <View key={index} style={styles.providerItem}>
+                  <View style={styles.providerHeader}>
+                    <Text style={styles.providerName}>{provider.name}</Text>
+                    <View style={styles.providerTypeBadge}>
+                      <Text style={styles.providerTypeText}>
+                        {provider.type.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+                  {provider.specialty && (
+                    <Text style={styles.providerSpecialty}>
+                      {provider.specialty}
+                    </Text>
+                  )}
+                  {provider.phone && (
+                    <Text style={styles.providerPhone}>{provider.phone}</Text>
+                  )}
+                </View>
+              ))}
+            </MedicalInfoCard>
+          )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 14,
+    color: "#6B7280",
+  },
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  topBarCenter: {
+    flex: 1,
+    alignItems: "center",
+    paddingHorizontal: 16,
+  },
+  topBarTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  topBarSubtitle: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    marginTop: 2,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  content: {
+    flex: 1,
+  },
+  contentContainer: {
+    padding: 20,
+  },
+  completionBanner: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  completionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  completionIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#D1FAE5",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  completionInfo: {
+    flex: 1,
+  },
+  completionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 2,
+  },
+  completionSubtitle: {
+    fontSize: 13,
+    color: "#6B7280",
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: "#10B981",
+    borderRadius: 4,
+  },
+  statsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 24,
+  },
+  statCard: {
+    flex: 1,
+    minWidth: "47%",
+    padding: 16,
+    borderRadius: 16,
+    alignItems: "center",
+  },
+  statIconContainer: {
+    marginBottom: 8,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: "#6B7280",
+    fontWeight: "500",
+  },
+  infoItem: {
+    flex: 1,
+    minWidth: "45%",
+  },
+  infoLabel: {
+    fontSize: 13,
+    color: "#6B7280",
+    marginBottom: 4,
+  },
+  infoValue: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  conditionItem: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  conditionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  conditionName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#111827",
+    flex: 1,
+  },
+  severityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  severityText: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  conditionDate: {
+    fontSize: 13,
+    color: "#6B7280",
+  },
+  contactItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  contactAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#EF4444",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  contactInitials: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  contactInfo: {
+    flex: 1,
+  },
+  contactHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 2,
+  },
+  contactName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  primaryBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: "#DBEAFE",
+  },
+  primaryText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#1E40AF",
+    letterSpacing: 0.5,
+  },
+  contactRelationship: {
+    fontSize: 13,
+    color: "#6B7280",
+    marginBottom: 2,
+  },
+  contactPhone: {
+    fontSize: 13,
+    color: "#3B82F6",
+  },
+  callButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#D1FAE5",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  surgeryItem: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  surgeryName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#111827",
+    marginBottom: 4,
+  },
+  surgeryDate: {
+    fontSize: 13,
+    color: "#6B7280",
+    marginBottom: 2,
+  },
+  surgeryHospital: {
+    fontSize: 13,
+    color: "#6B7280",
+  },
+  providerItem: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  providerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  providerName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#111827",
+    flex: 1,
+  },
+  providerTypeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: "#EDE9FE",
+  },
+  providerTypeText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#6366F1",
+    letterSpacing: 0.5,
+  },
+  providerSpecialty: {
+    fontSize: 13,
+    color: "#6B7280",
+    marginBottom: 2,
+  },
+  providerPhone: {
+    fontSize: 13,
+    color: "#3B82F6",
+  },
+});

@@ -32,7 +32,8 @@ coverage/
 .env.production.local
 
 # IDEs and editors
-.vscode/
+# Allow .vscode in project roots for shared team settings
+# .vscode/ # Commented out - team needs shared workspace settings
 .idea/
 *.swp
 *.swo
@@ -108,7 +109,8 @@ venv.bak/
 *.h5
 *.model
 data/
-models/
+# Only ignore ML models directory in ai-service, not backend models
+apps/ai-service/models/
 logs/
 
 # Temporary files

@@ -51,17 +51,19 @@ const userSchema = new mongoose.Schema(
     location: {
       lat: {
         type: Number,
-        required: function () {
-          return this.role === USER_ROLES.PATIENT;
-        },
+        // Location can be captured later via geolocation
+        // required: function () {
+        //   return this.role === USER_ROLES.PATIENT;
+        // },
         min: [-90, "Invalid latitude"],
         max: [90, "Invalid latitude"],
       },
       lng: {
         type: Number,
-        required: function () {
-          return this.role === USER_ROLES.PATIENT;
-        },
+        // Location can be captured later via geolocation
+        // required: function () {
+        //   return this.role === USER_ROLES.PATIENT;
+        // },
         min: [-180, "Invalid longitude"],
         max: [180, "Invalid longitude"],
       },
