@@ -818,7 +818,10 @@ export const verifyOTPAndRegister = asyncHandler(async (req, res) => {
 
     // Add role-specific data
     if (role === USER_ROLES.PATIENT) {
-      if (location) userData.location = location;
+      // Location is optional during signup - will be captured via geolocation later
+      if (location && location.lat && location.lng) {
+        userData.location = location;
+      }
       if (notifiers) userData.notifiers = notifiers;
       if (emergencyContacts) userData.emergencyContacts = emergencyContacts;
       if (address) userData.address = address;
@@ -840,7 +843,11 @@ export const verifyOTPAndRegister = asyncHandler(async (req, res) => {
     await user.save();
 
     // Generate token
-    const token = generateToken(user._id);
+    const token = generateToken({
+      id: user._id,
+      email: user.email,
+      role: user.role,
+    });
 
     sendResponse(
       res,
