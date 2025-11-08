@@ -232,7 +232,16 @@ export default function HomeScreen() {
       <View style={styles.mainContent}>
         {/* Active Emergency Alert */}
         {activeEmergency && (
-          <View style={styles.activeEmergencyBanner}>
+          <TouchableOpacity
+            style={styles.activeEmergencyBanner}
+            onPress={() =>
+              router.push({
+                pathname: "/emergency/tracking" as any,
+                params: { emergencyId: activeEmergency._id },
+              })
+            }
+            activeOpacity={0.7}
+          >
             <View style={styles.activeEmergencyContent}>
               <Ionicons name="alert-circle" size={24} color="#DC2626" />
               <View style={styles.activeEmergencyText}>
@@ -240,11 +249,12 @@ export default function HomeScreen() {
                   Active Emergency
                 </Text>
                 <Text style={styles.activeEmergencySubtitle}>
-                  Status: {activeEmergency.status.replace("_", " ")}
+                  Status: {activeEmergency.status.replace("_", " ")} • Tap to track
                 </Text>
               </View>
+              <Ionicons name="chevron-forward" size={24} color="#DC2626" />
             </View>
-          </View>
+          </TouchableOpacity>
         )}
 
         {/* Quick Actions - Minimalist Design */}
