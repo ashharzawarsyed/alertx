@@ -1,3 +1,3 @@
-import EmergenciesScreen from "../../src/screens/main/EmergenciesScreen";
+import EnhancedEmergenciesScreen from "../../src/screens/main/EnhancedEmergenciesScreen";
 
-export default EmergenciesScreen;
+export default EnhancedEmergenciesScreen;

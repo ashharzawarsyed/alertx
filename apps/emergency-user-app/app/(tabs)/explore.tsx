@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -9,11 +9,13 @@ import {
   TextInput,
   RefreshControl,
   Linking,
+  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { useNavigation } from "expo-router";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 
 import exploreService, {
   Hospital,
@@ -25,15 +27,21 @@ import HospitalCard from "@/src/components/explore/HospitalCard";
 import HealthTipCard from "@/src/components/explore/HealthTipCard";
 import FirstAidCard from "@/src/components/explore/FirstAidCard";
 import PreparednessCard from "@/src/components/explore/PreparednessCard";
+import Config from "@/src/config/config";
 
 type TabType = "hospitals" | "health" | "firstaid" | "preparedness";
+type HospitalViewMode = "list" | "map";
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function ExploreScreen() {
   const [activeTab, setActiveTab] = useState<TabType>("hospitals");
+  const [hospitalViewMode, setHospitalViewMode] = useState<HospitalViewMode>("list");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const mapRef = useRef<MapView>(null);
 
   // Location
   const [userLocation, setUserLocation] = useState<{
@@ -326,6 +334,52 @@ export default function ExploreScreen() {
               </View>
             )}
 
+            {/* View Mode Toggle */}
+            <View style={styles.viewModeContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.viewModeButton,
+                  hospitalViewMode === "list" && styles.viewModeActive,
+                ]}
+                onPress={() => setHospitalViewMode("list")}
+              >
+                <Ionicons
+                  name="list"
+                  size={20}
+                  color={hospitalViewMode === "list" ? "#FFF" : "#6B7280"}
+                />
+                <Text
+                  style={[
+                    styles.viewModeText,
+                    hospitalViewMode === "list" && styles.viewModeTextActive,
+                  ]}
+                >
+                  List
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.viewModeButton,
+                  hospitalViewMode === "map" && styles.viewModeActive,
+                ]}
+                onPress={() => setHospitalViewMode("map")}
+              >
+                <Ionicons
+                  name="map"
+                  size={20}
+                  color={hospitalViewMode === "map" ? "#FFF" : "#6B7280"}
+                />
+                <Text
+                  style={[
+                    styles.viewModeText,
+                    hospitalViewMode === "map" && styles.viewModeTextActive,
+                  ]}
+                >
+                  Map
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             {!filteredHospitals || filteredHospitals.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="business-outline" size={64} color="#D1D5DB" />
@@ -336,7 +390,7 @@ export default function ExploreScreen() {
                     : "No hospitals found in your area"}
                 </Text>
               </View>
-            ) : (
+            ) : hospitalViewMode === "list" ? (
               Array.isArray(filteredHospitals) &&
               filteredHospitals.map((hospital) => (
                 <HospitalCard
@@ -347,6 +401,46 @@ export default function ExploreScreen() {
                   }}
                 />
               ))
+            ) : (
+              <View style={styles.mapWrapper}>
+                <MapView
+                  ref={mapRef}
+                  provider={PROVIDER_GOOGLE}
+                  style={styles.hospitalMap}
+                  initialRegion={{
+                    latitude: userLocation?.latitude || filteredHospitals[0]?.location.lat || 37.7749,
+                    longitude: userLocation?.longitude || filteredHospitals[0]?.location.lng || -122.4194,
+                    latitudeDelta: 0.1,
+                    longitudeDelta: 0.1,
+                  }}
+                  showsUserLocation={true}
+                  showsMyLocationButton={true}
+                >
+                  {filteredHospitals.map((hospital) => (
+                    <Marker
+                      key={hospital._id}
+                      coordinate={{
+                        latitude: hospital.location.lat,
+                        longitude: hospital.location.lng,
+                      }}
+                      title={hospital.name}
+                      description={hospital.address}
+                    >
+                      <View style={styles.hospitalMarker}>
+                        <Ionicons name="medical" size={24} color="#FFF" />
+                      </View>
+                    </Marker>
+                  ))}
+                </MapView>
+                <View style={styles.mapInfoCard}>
+                  <Text style={styles.mapInfoTitle}>
+                    {filteredHospitals.length} Hospital{filteredHospitals.length !== 1 ? "s" : ""} Nearby
+                  </Text>
+                  <Text style={styles.mapInfoSubtitle}>
+                    Tap markers for details
+                  </Text>
+                </View>
+              </View>
             )}
           </>
         )}
@@ -652,5 +746,81 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#9CA3AF",
     textAlign: "center",
+  },
+  viewModeContainer: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 16,
+  },
+  viewModeButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    gap: 6,
+  },
+  viewModeActive: {
+    backgroundColor: "#111827",
+  },
+  viewModeText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#6B7280",
+  },
+  viewModeTextActive: {
+    color: "#FFFFFF",
+  },
+  mapWrapper: {
+    height: SCREEN_HEIGHT * 0.6,
+    borderRadius: 16,
+    overflow: "hidden",
+    marginBottom: 16,
+    position: "relative",
+  },
+  hospitalMap: {
+    flex: 1,
+  },
+  hospitalMarker: {
+    width: 48,
+    height: 48,
+    backgroundColor: "#EF4444",
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 3,
+    borderColor: "#FFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  mapInfoCard: {
+    position: "absolute",
+    top: 16,
+    left: 16,
+    right: 16,
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  mapInfoTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 4,
+  },
+  mapInfoSubtitle: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#6B7280",
   },
 });

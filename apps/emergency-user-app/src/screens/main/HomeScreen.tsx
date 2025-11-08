@@ -101,10 +101,11 @@ export default function HomeScreen() {
   }, [fetchActiveEmergency, user]);
 
   const triggerEmergency = async () => {
+    // Double check for active emergency before proceeding
     if (activeEmergency) {
       Alert.alert(
         "Active Emergency",
-        "You already have an active emergency. Please wait for it to be completed.",
+        "You already have an active emergency. Tap the banner to track it.",
         [{ text: "OK" }]
       );
       return;
@@ -116,11 +117,25 @@ export default function HomeScreen() {
       );
 
       if (response.success && response.data) {
+        // Update active emergency state immediately
+        setActiveEmergency(response.data.emergency);
+        
         Alert.alert(
           "✅ Emergency Activated",
-          `Help is on the way!\n\nEmergency ID: ${response.data?.emergency._id}`,
-          [{ text: "OK" }]
+          `Help is on the way!\n\nEmergency ID: ${response.data.emergency._id?.slice(-6)}`,
+          [
+            {
+              text: "Track Emergency",
+              onPress: () =>
+                router.push({
+                  pathname: "/emergency/tracking" as any,
+                  params: { emergencyId: response.data!.emergency._id },
+                }),
+            },
+          ]
         );
+        
+        // Refresh emergency list
         fetchActiveEmergency();
       } else {
         Alert.alert(
@@ -129,6 +144,7 @@ export default function HomeScreen() {
         );
       }
     } catch (error: any) {
+      console.error("Emergency trigger error:", error);
       Alert.alert("Error", error.message || "Failed to activate emergency");
     }
   };

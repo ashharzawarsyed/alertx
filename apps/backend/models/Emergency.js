@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import mongoosePaginate from "mongoose-paginate-v2";
 import { EMERGENCY_STATUS, SEVERITY_LEVELS } from "../utils/constants.js";
 
 const emergencySchema = new mongoose.Schema(
@@ -206,5 +207,8 @@ emergencySchema.methods.addNote = function (note, userId) {
   });
   return this.save();
 };
+
+// Add pagination plugin
+emergencySchema.plugin(mongoosePaginate);
 
 export default mongoose.model("Emergency", emergencySchema);
