@@ -6,17 +6,45 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  Linking,
   ActivityIndicator,
   Animated,
+  Platform,
+  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
-import MapViewDirections from "react-native-maps-directions";
-
 import { emergencyService, Emergency } from "../../services/emergencyService";
+import CrossPlatformMap, { Marker } from "../../components/CrossPlatformMap";
+
+const { width, height } = Dimensions.get("window");
+const ASPECT_RATIO = width / height;
+
+// Extended Emergency type with tracking data
+interface ExtendedEmergency extends Emergency {
+  patientLocation?: {
+    coordinates: [number, number];
+    address?: string;
+  };
+  assignedAmbulance?: {
+    _id: string;
+    vehicleNumber: string;
+    currentLocation?: {
+      coordinates: [number, number];
+    };
+  };
+  triageData?: {
+    severity: string;
+    symptoms: string[];
+    score: number;
+  };
+  timeline?: Array<{
+    status: string;
+    timestamp: Date;
+    note?: string;
+  }>;
+  estimatedArrival?: Date;
+}
 
 interface DriverLocation {
   latitude: number;
@@ -28,133 +56,134 @@ export default function EmergencyTrackingScreen() {
   const params = useLocalSearchParams();
   const emergencyId = params.emergencyId as string;
 
-  const [emergency, setEmergency] = useState<Emergency | null>(null);
+  const [emergency, setEmergency] = useState<ExtendedEmergency | null>(null);
   const [loading, setLoading] = useState(true);
-  const [driverLocation, setDriverLocation] = useState<DriverLocation | null>(
-    null
-  );
-  const [eta, setEta] = useState<number>(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [driverLocation, setDriverLocation] = useState<DriverLocation | null>(null);
+  const [eta, setEta] = useState<string | null>(null);
+  const [distance, setDistance] = useState<string | null>(null);
 
-  const mapRef = useRef<MapView>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Pulse animation for ambulance marker
   useEffect(() => {
-    Animated.loop(
+    const pulse = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1.3,
           duration: 1000,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== "web",
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
           duration: 1000,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== "web",
         }),
       ])
-    ).start();
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, []);
+
+  // Calculate distance and ETA using Haversine formula
+  const calculateETA = useCallback((coords1: [number, number], coords2: [number, number]) => {
+    const R = 6371; // Earth's radius in km
+    const dLat = ((coords2[1] - coords1[1]) * Math.PI) / 180;
+    const dLon = ((coords2[0] - coords1[0]) * Math.PI) / 180;
+    
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((coords1[1] * Math.PI) / 180) *
+        Math.cos((coords2[1] * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distanceKm = R * c;
+    
+    // Assume average speed of 40 km/h in city traffic
+    const etaMinutes = Math.round((distanceKm / 40) * 60);
+    
+    setDistance(`${distanceKm.toFixed(1)} km`);
+    setEta(`${etaMinutes} min`);
   }, []);
 
   // Fetch emergency details
-  const fetchEmergencyDetails = useCallback(async () => {
+  const fetchEmergencyDetails = useCallback(async (showLoader = true) => {
     try {
-      const response = await emergencyService.getEmergencyDetails(emergencyId);
+      if (showLoader) setLoading(true);
+      if (!showLoader) setRefreshing(true);
 
+      const response = await emergencyService.getEmergencyById(emergencyId);
+      
       if (response.success && response.data) {
-        setEmergency(response.data.emergency);
+        const emergencyData = response.data.emergency as ExtendedEmergency;
+        setEmergency(emergencyData);
 
-        // Simulate driver location if driver is assigned
-        if (
-          response.data.emergency.assignedDriver &&
-          response.data.emergency.status !== "pending"
+        // Calculate ETA if ambulance is assigned and has location
+        if (emergencyData.assignedAmbulance?.currentLocation) {
+          const patientCoords: [number, number] = emergencyData.patientLocation
+            ? emergencyData.patientLocation.coordinates
+            : [emergencyData.location.lng, emergencyData.location.lat];
+          
+          const ambulanceCoords = emergencyData.assignedAmbulance.currentLocation.coordinates;
+          
+          calculateETA(ambulanceCoords, patientCoords);
+          
+          // Set driver location for marker
+          setDriverLocation({
+            latitude: ambulanceCoords[1],
+            longitude: ambulanceCoords[0],
+          });
+        } else if (
+          emergencyData.assignedDriver &&
+          emergencyData.status !== "pending"
         ) {
-          // Simulate driver location near patient (in production, use real-time data)
-          const patientLat = response.data.emergency.location.lat;
-          const patientLng = response.data.emergency.location.lng;
-
-          // Random offset for simulation (0.01 degrees ≈ 1km)
+          // Simulate driver location if not available (for demo purposes)
+          const patientLat = emergencyData.location.lat;
+          const patientLng = emergencyData.location.lng;
+          
           const offset = 0.02;
           const simulatedLocation: DriverLocation = {
             latitude: patientLat + (Math.random() - 0.5) * offset,
             longitude: patientLng + (Math.random() - 0.5) * offset,
           };
-
+          
           setDriverLocation(simulatedLocation);
-
-          // Calculate ETA
-          const calculatedEta = emergencyService.calculateETA(
-            {
-              lat: simulatedLocation.latitude,
-              lng: simulatedLocation.longitude,
-            },
-            { lat: patientLat, lng: patientLng }
+          
+          // Calculate simulated ETA
+          calculateETA(
+            [simulatedLocation.longitude, simulatedLocation.latitude],
+            [patientLng, patientLat]
           );
-          setEta(calculatedEta);
-
-          // Fit map to show both markers
-          setTimeout(() => {
-            mapRef.current?.fitToCoordinates(
-              [
-                {
-                  latitude: patientLat,
-                  longitude: patientLng,
-                },
-                simulatedLocation,
-              ],
-              {
-                edgePadding: { top: 100, right: 50, bottom: 300, left: 50 },
-                animated: true,
-              }
-            );
-          }, 500);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching emergency:", error);
       Alert.alert("Error", "Failed to load emergency details");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [emergencyId]);
+  }, [emergencyId, calculateETA]);
 
   useEffect(() => {
     fetchEmergencyDetails();
 
     // Poll for updates every 10 seconds
     const interval = setInterval(() => {
-      fetchEmergencyDetails();
+      fetchEmergencyDetails(false);
     }, 10000);
 
     return () => clearInterval(interval);
   }, [fetchEmergencyDetails]);
 
-  const handleCallDriver = () => {
-    if (emergency?.assignedDriver) {
-      const phone = (emergency.assignedDriver as any).phone;
-      if (phone) {
-        Linking.openURL(`tel:${phone}`);
-      }
-    }
-  };
-
-  const handleCallHospital = () => {
-    if (emergency?.assignedHospital) {
-      const phone = (emergency.assignedHospital as any).phone;
-      if (phone) {
-        Linking.openURL(`tel:${phone}`);
-      }
-    }
-  };
-
   const handleCancelEmergency = () => {
     Alert.alert(
       "Cancel Emergency",
-      "Are you sure you want to cancel this emergency request? This cannot be undone.",
+      "Are you sure you want to cancel this emergency request?",
       [
-        { text: "No, Keep Active", style: "cancel" },
+        { text: "No", style: "cancel" },
         {
           text: "Yes, Cancel",
           style: "destructive",
@@ -162,11 +191,11 @@ export default function EmergencyTrackingScreen() {
             try {
               const response = await emergencyService.cancelEmergency(
                 emergencyId,
-                "Cancelled by patient"
+                "Cancelled by user"
               );
 
               if (response.success) {
-                Alert.alert("Cancelled", "Emergency has been cancelled", [
+                Alert.alert("Emergency Cancelled", "Your emergency request has been cancelled.", [
                   { text: "OK", onPress: () => router.back() },
                 ]);
               } else {
@@ -186,9 +215,15 @@ export default function EmergencyTrackingScreen() {
       case "pending":
         return "#F59E0B";
       case "accepted":
+      case "ambulance_dispatched":
         return "#3B82F6";
       case "in_progress":
+      case "ambulance_arrived":
+      case "patient_picked_up":
         return "#8B5CF6";
+      case "en_route_to_hospital":
+        return "#7C3AED";
+      case "arrived_at_hospital":
       case "completed":
         return "#10B981";
       case "cancelled":
@@ -198,8 +233,27 @@ export default function EmergencyTrackingScreen() {
     }
   };
 
-  const getStatusText = (status: string) => {
-    return status.replace("_", " ").toUpperCase();
+  const getStatusLabel = (status: string) => {
+    return status
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
+
+  const getSeverityColor = (severity: string) => {
+    switch (severity?.toLowerCase()) {
+      case "critical":
+        return "#DC2626";
+      case "high":
+        return "#EF4444";
+      case "medium":
+      case "moderate":
+        return "#F59E0B";
+      case "low":
+        return "#10B981";
+      default:
+        return "#6B7280";
+    }
   };
 
   if (loading) {
@@ -216,13 +270,8 @@ export default function EmergencyTrackingScreen() {
       <SafeAreaView style={styles.errorContainer}>
         <Ionicons name="alert-circle" size={64} color="#EF4444" />
         <Text style={styles.errorTitle}>Emergency Not Found</Text>
-        <Text style={styles.errorSubtitle}>
-          Unable to load emergency details
-        </Text>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
+        <Text style={styles.errorSubtitle}>Unable to load emergency details</Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
       </SafeAreaView>
@@ -233,41 +282,35 @@ export default function EmergencyTrackingScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       {/* Top Bar */}
       <View style={styles.topBar}>
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={() => router.back()}
-        >
+        <TouchableOpacity style={styles.iconButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#111827" />
         </TouchableOpacity>
         <View style={styles.topBarCenter}>
           <Text style={styles.topBarTitle}>Emergency Tracking</Text>
-          <Text style={styles.topBarSubtitle}>ID: {emergency._id.slice(-6)}</Text>
+          <Text style={styles.topBarSubtitle}>ID: {emergency._id.slice(-8)}</Text>
         </View>
         <TouchableOpacity
           style={styles.iconButton}
-          onPress={() => {
-            setRefreshing(true);
-            fetchEmergencyDetails();
-          }}
+          onPress={() => fetchEmergencyDetails(false)}
         >
-          <Ionicons name="refresh" size={24} color="#111827" />
+          <Ionicons 
+            name="refresh" 
+            size={24} 
+            color={refreshing ? "#EF4444" : "#111827"} 
+          />
         </TouchableOpacity>
       </View>
 
       {/* Map View */}
       <View style={styles.mapContainer}>
-        <MapView
-          ref={mapRef}
-          provider={PROVIDER_GOOGLE}
-          style={styles.map}
+        <CrossPlatformMap
           initialRegion={{
             latitude: emergency.location.lat,
             longitude: emergency.location.lng,
             latitudeDelta: 0.02,
-            longitudeDelta: 0.02,
+            longitudeDelta: 0.02 * ASPECT_RATIO,
           }}
-          showsUserLocation
-          showsMyLocationButton
+          style={styles.map}
         >
           {/* Patient Location Marker */}
           <Marker
@@ -277,6 +320,7 @@ export default function EmergencyTrackingScreen() {
             }}
             title="Your Location"
             description={emergency.location.address || "Emergency Location"}
+            pinColor="#EF4444"
           >
             <View style={styles.patientMarker}>
               <Ionicons name="person" size={24} color="#FFFFFF" />
@@ -285,51 +329,30 @@ export default function EmergencyTrackingScreen() {
 
           {/* Ambulance Marker */}
           {driverLocation && (
-            <>
-              <Marker
-                coordinate={driverLocation}
-                title="Ambulance"
-                description={
-                  emergency.assignedDriver
-                    ? (emergency.assignedDriver as any).name
-                    : "Ambulance"
-                }
-                anchor={{ x: 0.5, y: 0.5 }}
+            <Marker
+              coordinate={driverLocation}
+              title="Ambulance"
+              description="En route to your location"
+              pinColor="#3B82F6"
+            >
+              <Animated.View
+                style={[
+                  styles.ambulanceMarker,
+                  { transform: [{ scale: pulseAnim }] },
+                ]}
               >
-                <Animated.View
-                  style={[
-                    styles.ambulanceMarker,
-                    { transform: [{ scale: pulseAnim }] },
-                  ]}
-                >
-                  <Ionicons name="medkit" size={24} color="#FFFFFF" />
-                </Animated.View>
-              </Marker>
-
-              {/* Route */}
-              <MapViewDirections
-                origin={driverLocation}
-                destination={{
-                  latitude: emergency.location.lat,
-                  longitude: emergency.location.lng,
-                }}
-                apikey="YOUR_GOOGLE_MAPS_API_KEY" // Replace with actual API key
-                strokeWidth={4}
-                strokeColor="#EF4444"
-                optimizeWaypoints
-                onError={(error) =>
-                  console.log("Directions error:", error)
-                }
-              />
-            </>
+                <Ionicons name="medkit" size={24} color="#FFFFFF" />
+              </Animated.View>
+            </Marker>
           )}
-        </MapView>
+        </CrossPlatformMap>
 
         {/* ETA Overlay */}
-        {driverLocation && eta > 0 && (
+        {driverLocation && eta && (
           <View style={styles.etaOverlay}>
             <Ionicons name="time" size={20} color="#FFFFFF" />
-            <Text style={styles.etaText}>ETA: {eta} min</Text>
+            <Text style={styles.etaText}>ETA: {eta}</Text>
+            {distance && <Text style={styles.etaDistance}>• {distance}</Text>}
           </View>
         )}
       </View>
@@ -351,23 +374,14 @@ export default function EmergencyTrackingScreen() {
               ]}
             >
               <Text style={styles.statusText}>
-                {getStatusText(emergency.status)}
+                {getStatusLabel(emergency.status)}
               </Text>
             </View>
             {emergency.severityLevel && (
               <View
                 style={[
                   styles.severityBadge,
-                  {
-                    backgroundColor:
-                      emergency.severityLevel === "critical"
-                        ? "#DC2626"
-                        : emergency.severityLevel === "high"
-                          ? "#EF4444"
-                          : emergency.severityLevel === "medium"
-                            ? "#F59E0B"
-                            : "#10B981",
-                  },
+                  { backgroundColor: getSeverityColor(emergency.severityLevel) },
                 ]}
               >
                 <Text style={styles.severityText}>
@@ -376,6 +390,27 @@ export default function EmergencyTrackingScreen() {
               </View>
             )}
           </View>
+
+          {/* Triage Info */}
+          {emergency.triageData && (
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Ionicons name="pulse" size={24} color="#EF4444" />
+                <Text style={styles.cardTitle}>Triage Assessment</Text>
+              </View>
+              <Text style={styles.triageScore}>
+                Score: {emergency.triageData.score}/10
+              </Text>
+              {emergency.triageData.symptoms && emergency.triageData.symptoms.length > 0 && (
+                <View style={styles.symptomsContainer}>
+                  <Text style={styles.symptomsLabel}>Symptoms:</Text>
+                  <Text style={styles.symptomsText}>
+                    {emergency.triageData.symptoms.join(", ")}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
 
           {/* Driver Info Card */}
           {emergency.assignedDriver && (
@@ -399,16 +434,9 @@ export default function EmergencyTrackingScreen() {
                     {(emergency.assignedDriver as any).name || "Driver"}
                   </Text>
                   <Text style={styles.driverSubtext}>
-                    {(emergency.assignedDriver as any).driverInfo
-                      ?.ambulanceNumber || "Ambulance"}
+                    {emergency.assignedAmbulance?.vehicleNumber || "Ambulance"}
                   </Text>
                 </View>
-                <TouchableOpacity
-                  style={styles.callButton}
-                  onPress={handleCallDriver}
-                >
-                  <Ionicons name="call" size={20} color="#FFFFFF" />
-                </TouchableOpacity>
               </View>
             </View>
           )}
@@ -418,25 +446,20 @@ export default function EmergencyTrackingScreen() {
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <Ionicons name="business" size={24} color="#3B82F6" />
-                <Text style={styles.cardTitle}>Assigned Hospital</Text>
+                <Text style={styles.cardTitle}>Destination Hospital</Text>
               </View>
               <View style={styles.hospitalInfo}>
-                <View style={styles.hospitalDetails}>
-                  <Text style={styles.hospitalName}>
-                    {(emergency.assignedHospital as any).name ||
-                      "Hospital"}
+                <Text style={styles.hospitalName}>
+                  {(emergency.assignedHospital as any).name || "Hospital"}
+                </Text>
+                <Text style={styles.hospitalAddress}>
+                  {(emergency.assignedHospital as any).address || "Address not available"}
+                </Text>
+                {(emergency.assignedHospital as any).phone && (
+                  <Text style={styles.hospitalPhone}>
+                    {(emergency.assignedHospital as any).phone}
                   </Text>
-                  <Text style={styles.hospitalAddress}>
-                    {(emergency.assignedHospital as any).address ||
-                      "Address not available"}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={[styles.callButton, { backgroundColor: "#3B82F6" }]}
-                  onPress={handleCallHospital}
-                >
-                  <Ionicons name="call" size={20} color="#FFFFFF" />
-                </TouchableOpacity>
+                )}
               </View>
             </View>
           )}
@@ -448,96 +471,68 @@ export default function EmergencyTrackingScreen() {
               <Text style={styles.cardTitle}>Emergency Timeline</Text>
             </View>
             <View style={styles.timeline}>
-              {/* Request Time */}
-              <View style={styles.timelineItem}>
-                <View style={[styles.timelineDot, { backgroundColor: "#10B981" }]} />
-                <View style={styles.timelineContent}>
-                  <Text style={styles.timelineTitle}>Emergency Requested</Text>
-                  <Text style={styles.timelineTime}>
-                    {new Date(emergency.requestTime).toLocaleTimeString()}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Response Time */}
-              {emergency.responseTime && (
-                <View style={styles.timelineItem}>
-                  <View style={[styles.timelineDot, { backgroundColor: "#3B82F6" }]} />
-                  <View style={styles.timelineContent}>
-                    <Text style={styles.timelineTitle}>Ambulance Accepted</Text>
-                    <Text style={styles.timelineTime}>
-                      {new Date(emergency.responseTime).toLocaleTimeString()}
-                    </Text>
+              {emergency.timeline && emergency.timeline.length > 0 ? (
+                emergency.timeline
+                  .slice()
+                  .reverse()
+                  .map((event, index) => (
+                    <View key={index} style={styles.timelineItem}>
+                      <View
+                        style={[
+                          styles.timelineDot,
+                          { backgroundColor: getStatusColor(event.status) },
+                        ]}
+                      />
+                      <View style={styles.timelineContent}>
+                        <Text style={styles.timelineTitle}>
+                          {getStatusLabel(event.status)}
+                        </Text>
+                        <Text style={styles.timelineTime}>
+                          {new Date(event.timestamp).toLocaleTimeString()}
+                        </Text>
+                        {event.note && (
+                          <Text style={styles.timelineNote}>{event.note}</Text>
+                        )}
+                      </View>
+                    </View>
+                  ))
+              ) : (
+                <>
+                  <View style={styles.timelineItem}>
+                    <View style={[styles.timelineDot, { backgroundColor: "#10B981" }]} />
+                    <View style={styles.timelineContent}>
+                      <Text style={styles.timelineTitle}>Emergency Requested</Text>
+                      <Text style={styles.timelineTime}>
+                        {new Date(emergency.createdAt).toLocaleTimeString()}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              )}
 
-              {/* Pickup Time */}
-              {emergency.pickupTime && (
-                <View style={styles.timelineItem}>
-                  <View style={[styles.timelineDot, { backgroundColor: "#8B5CF6" }]} />
-                  <View style={styles.timelineContent}>
-                    <Text style={styles.timelineTitle}>Patient Picked Up</Text>
-                    <Text style={styles.timelineTime}>
-                      {new Date(emergency.pickupTime).toLocaleTimeString()}
-                    </Text>
-                  </View>
-                </View>
-              )}
+                  {emergency.responseTime && (
+                    <View style={styles.timelineItem}>
+                      <View style={[styles.timelineDot, { backgroundColor: "#3B82F6" }]} />
+                      <View style={styles.timelineContent}>
+                        <Text style={styles.timelineTitle}>Ambulance Accepted</Text>
+                        <Text style={styles.timelineTime}>
+                          {new Date(emergency.responseTime).toLocaleTimeString()}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
 
-              {/* Hospital Time */}
-              {emergency.hospitalTime && (
-                <View style={styles.timelineItem}>
-                  <View style={[styles.timelineDot, { backgroundColor: "#F59E0B" }]} />
-                  <View style={styles.timelineContent}>
-                    <Text style={styles.timelineTitle}>Arrived at Hospital</Text>
-                    <Text style={styles.timelineTime}>
-                      {new Date(emergency.hospitalTime).toLocaleTimeString()}
-                    </Text>
-                  </View>
-                </View>
+                  {emergency.completedTime && (
+                    <View style={styles.timelineItem}>
+                      <View style={[styles.timelineDot, { backgroundColor: "#10B981" }]} />
+                      <View style={styles.timelineContent}>
+                        <Text style={styles.timelineTitle}>Emergency Completed</Text>
+                        <Text style={styles.timelineTime}>
+                          {new Date(emergency.completedTime).toLocaleTimeString()}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                </>
               )}
-
-              {/* Completed */}
-              {emergency.completedTime && (
-                <View style={styles.timelineItem}>
-                  <View style={[styles.timelineDot, { backgroundColor: "#10B981" }]} />
-                  <View style={styles.timelineContent}>
-                    <Text style={styles.timelineTitle}>Emergency Completed</Text>
-                    <Text style={styles.timelineTime}>
-                      {new Date(emergency.completedTime).toLocaleTimeString()}
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </View>
-          </View>
-
-          {/* Emergency Details */}
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="information-circle" size={24} color="#6B7280" />
-              <Text style={styles.cardTitle}>Emergency Details</Text>
-            </View>
-            <View style={styles.detailsGrid}>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Symptoms</Text>
-                <Text style={styles.detailValue}>
-                  {emergency.symptoms.join(", ")}
-                </Text>
-              </View>
-              {emergency.description && (
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Description</Text>
-                  <Text style={styles.detailValue}>{emergency.description}</Text>
-                </View>
-              )}
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Triage Score</Text>
-                <Text style={styles.detailValue}>
-                  {emergency.triageScore}/10
-                </Text>
-              </View>
             </View>
           </View>
 
@@ -552,7 +547,6 @@ export default function EmergencyTrackingScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Bottom Padding */}
           <View style={{ height: 20 }} />
         </ScrollView>
       </View>
@@ -580,8 +574,8 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 24,
     backgroundColor: "#FFFFFF",
+    padding: 24,
   },
   errorTitle: {
     fontSize: 20,
@@ -700,6 +694,11 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#FFFFFF",
   },
+  etaDistance: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
 
   // Bottom Sheet
   bottomSheet: {
@@ -771,6 +770,25 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#111827",
   },
+  triageScore: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111827",
+    marginBottom: 8,
+  },
+  symptomsContainer: {
+    marginTop: 8,
+  },
+  symptomsLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#6B7280",
+    marginBottom: 4,
+  },
+  symptomsText: {
+    fontSize: 14,
+    color: "#111827",
+  },
 
   // Driver Info
   driverInfo: {
@@ -804,23 +822,10 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     marginTop: 2,
   },
-  callButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#EF4444",
-    justifyContent: "center",
-    alignItems: "center",
-  },
 
   // Hospital Info
   hospitalInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  hospitalDetails: {
-    flex: 1,
+    gap: 8,
   },
   hospitalName: {
     fontSize: 16,
@@ -830,7 +835,11 @@ const styles = StyleSheet.create({
   hospitalAddress: {
     fontSize: 14,
     color: "#6B7280",
-    marginTop: 4,
+  },
+  hospitalPhone: {
+    fontSize: 14,
+    color: "#3B82F6",
+    fontWeight: "500",
   },
 
   // Timeline
@@ -860,23 +869,11 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     marginTop: 2,
   },
-
-  // Details
-  detailsGrid: {
-    gap: 12,
-  },
-  detailItem: {
-    gap: 4,
-  },
-  detailLabel: {
+  timelineNote: {
     fontSize: 12,
-    fontWeight: "600",
     color: "#6B7280",
-    textTransform: "uppercase",
-  },
-  detailValue: {
-    fontSize: 14,
-    color: "#111827",
+    marginTop: 4,
+    fontStyle: "italic",
   },
 
   // Cancel Button

@@ -1,15 +1,7 @@
 import axios, { AxiosInstance } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
-
-// Get backend URL based on environment
-const getBaseURL = () => {
-  if (__DEV__) {
-    // For local development
-    return "http://192.168.100.23:5001/api/v1"; // Works on real devices
-  }
-  return "https://your-production-api.com/api/v1";
-};
+import Config from "../config/config";
 
 export interface EmergencyData {
   symptoms: string[];
@@ -91,7 +83,7 @@ class EmergencyService {
   private baseURL: string;
 
   constructor() {
-    this.baseURL = getBaseURL();
+    this.baseURL = Config.API_URL;
     this.api = axios.create({
       baseURL: this.baseURL,
       timeout: 25000,
