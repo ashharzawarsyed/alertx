@@ -8,6 +8,7 @@ import {
   Animated,
   PanResponder,
   Dimensions,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -54,7 +55,7 @@ export default function HomeScreen() {
           // Slide completed - trigger emergency
           Animated.spring(pan, {
             toValue: MAX_TRANSLATE,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }).start(() => {
             triggerEmergency();
             pan.setValue(0);
@@ -63,7 +64,7 @@ export default function HomeScreen() {
           // Slide not completed - return to start
           Animated.spring(pan, {
             toValue: 0,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }).start();
         }
       },
@@ -172,10 +173,16 @@ export default function HomeScreen() {
       <View style={styles.topBar}>
         <Text style={styles.appName}>AlertX</Text>
         <View style={styles.topIcons}>
-          <TouchableOpacity style={styles.iconButton}>
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={() => router.push("/notifications")}
+          >
             <Ionicons name="notifications-outline" size={24} color="#111827" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton}>
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={() => router.push("/settings")}
+          >
             <Ionicons name="settings-outline" size={24} color="#111827" />
           </TouchableOpacity>
         </View>

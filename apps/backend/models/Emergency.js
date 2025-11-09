@@ -208,6 +208,44 @@ emergencySchema.methods.addNote = function (note, userId) {
   return this.save();
 };
 
+// Method to check if emergency has timed out (1 hour)
+emergencySchema.methods.checkTimeout = function () {
+  const oneHourInMs = 60 * 60 * 1000;
+  const timeSinceRequest = Date.now() - this.requestTime.getTime();
+  
+  if (
+    this.status === EMERGENCY_STATUS.PENDING &&
+    timeSinceRequest > oneHourInMs
+  ) {
+    this.status = EMERGENCY_STATUS.CANCELLED;
+    this.cancelledAt = new Date();
+    this.cancellationReason = "Auto-cancelled: No response after 1 hour";
+    return true;
+  }
+  return false;
+};
+
+// Static method to auto-cancel timed out emergencies
+emergencySchema.statics.autoCancelTimedOut = async function () {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  
+  const result = await this.updateMany(
+    {
+      status: EMERGENCY_STATUS.PENDING,
+      requestTime: { $lte: oneHourAgo },
+    },
+    {
+      $set: {
+        status: EMERGENCY_STATUS.CANCELLED,
+        cancelledAt: new Date(),
+        cancellationReason: "Auto-cancelled: No response after 1 hour",
+      },
+    }
+  );
+
+  return result;
+};
+
 // Add pagination plugin
 emergencySchema.plugin(mongoosePaginate);
 

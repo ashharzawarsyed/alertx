@@ -114,17 +114,23 @@ export default function FirstAidCard({
         transparent
         onRequestClose={handleClose}
       >
-        <View
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={handleClose}
           style={[
             styles.modalOverlay,
             { paddingBottom: insets.bottom + BOTTOM_BAR_HEIGHT },
           ]}
         >
-          <View
-            style={[styles.modalContent, { paddingBottom: insets.bottom + 24 }]}
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
-            <View style={styles.modalHeader}>
+            <View
+              style={[styles.modalContent, { paddingBottom: insets.bottom + 24 }]}
+            >
+              {/* Modal Header */}
+              <View style={styles.modalHeader}>
               <View style={styles.modalTitleContainer}>
                 <View
                   style={[
@@ -224,7 +230,8 @@ export default function FirstAidCard({
               <View style={{ height: insets.bottom + 16 }} />
             </ScrollView>
           </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </>
   );

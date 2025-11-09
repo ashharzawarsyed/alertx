@@ -15,7 +15,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { useNavigation } from "expo-router";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 
 import exploreService, {
   Hospital,
@@ -28,6 +27,7 @@ import HealthTipCard from "@/src/components/explore/HealthTipCard";
 import FirstAidCard from "@/src/components/explore/FirstAidCard";
 import PreparednessCard from "@/src/components/explore/PreparednessCard";
 import Config from "@/src/config/config";
+import CrossPlatformMap, { Marker } from "@/src/components/CrossPlatformMap";
 
 type TabType = "hospitals" | "health" | "firstaid" | "preparedness";
 type HospitalViewMode = "list" | "map";
@@ -41,7 +41,6 @@ export default function ExploreScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const mapRef = useRef<MapView>(null);
 
   // Location
   const [userLocation, setUserLocation] = useState<{
@@ -403,19 +402,30 @@ export default function ExploreScreen() {
               ))
             ) : (
               <View style={styles.mapWrapper}>
-                <MapView
-                  ref={mapRef}
-                  provider={PROVIDER_GOOGLE}
-                  style={styles.hospitalMap}
+                {/* Hospital Map */}
+                <CrossPlatformMap
                   initialRegion={{
-                    latitude: userLocation?.latitude || filteredHospitals[0]?.location.lat || 37.7749,
-                    longitude: userLocation?.longitude || filteredHospitals[0]?.location.lng || -122.4194,
-                    latitudeDelta: 0.1,
-                    longitudeDelta: 0.1,
+                    latitude: userLocation?.latitude || 0,
+                    longitude: userLocation?.longitude || 0,
+                    latitudeDelta: 0.05,
+                    longitudeDelta: 0.05,
                   }}
-                  showsUserLocation={true}
-                  showsMyLocationButton={true}
+                  style={styles.hospitalMap}
                 >
+                  {/* User Location Marker */}
+                  {userLocation && (
+                    <Marker
+                      coordinate={userLocation}
+                      title="Your Location"
+                      pinColor="#3B82F6"
+                    >
+                      <View style={styles.userMarker}>
+                        <Ionicons name="location" size={20} color="#FFF" />
+                      </View>
+                    </Marker>
+                  )}
+
+                  {/* Hospital Markers */}
                   {filteredHospitals.map((hospital) => (
                     <Marker
                       key={hospital._id}
@@ -425,13 +435,15 @@ export default function ExploreScreen() {
                       }}
                       title={hospital.name}
                       description={hospital.address}
+                      pinColor="#FF3B30"
                     >
                       <View style={styles.hospitalMarker}>
-                        <Ionicons name="medical" size={24} color="#FFF" />
+                        <Ionicons name="medical" size={20} color="#FFF" />
                       </View>
                     </Marker>
                   ))}
-                </MapView>
+                </CrossPlatformMap>
+
                 <View style={styles.mapInfoCard}>
                   <Text style={styles.mapInfoTitle}>
                     {filteredHospitals.length} Hospital{filteredHospitals.length !== 1 ? "s" : ""} Nearby
@@ -782,6 +794,47 @@ const styles = StyleSheet.create({
   },
   hospitalMap: {
     flex: 1,
+    backgroundColor: "#F9FAFB",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  mapPlaceholderContent: {
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  mapPlaceholderTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#374151",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  mapPlaceholderText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#6B7280",
+    marginBottom: 8,
+  },
+  mapPlaceholderHint: {
+    fontSize: 13,
+    color: "#9CA3AF",
+    textAlign: "center",
+  },
+  userMarker: {
+    width: 48,
+    height: 48,
+    backgroundColor: "#3B82F6",
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 3,
+    borderColor: "#FFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   hospitalMarker: {
     width: 48,

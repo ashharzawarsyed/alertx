@@ -16,11 +16,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { router } from "expo-router";
 import { emergencyService, Emergency } from "../../services/emergencyService";
 import { useAuthStore } from "../../store/authStore";
 import Config from "../../config/config";
+import CrossPlatformMap, { Marker } from "../../components/CrossPlatformMap";
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -51,7 +51,6 @@ export default function EmergenciesScreen() {
   const [selectedEmergency, setSelectedEmergency] = useState<ExtendedEmergency | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  const mapRef = useRef<MapView>(null);
 
   const fetchEmergencies = useCallback(async () => {
     if (!user) {
@@ -374,30 +373,49 @@ export default function EmergenciesScreen() {
       ["pending", "accepted", "in_progress"].includes(e.status)
     );
 
+    // Calculate center from emergencies with locations
+    const emergenciesWithLocation = activeEmergencies.filter(
+      (e) => e.location?.lat && e.location?.lng
+    );
+
+    let centerLat = 0;
+    let centerLng = 0;
+    if (emergenciesWithLocation.length > 0) {
+      centerLat =
+        emergenciesWithLocation.reduce(
+          (sum, e) => sum + e.location.lat,
+          0
+        ) / emergenciesWithLocation.length;
+      centerLng =
+        emergenciesWithLocation.reduce(
+          (sum, e) => sum + e.location.lng,
+          0
+        ) / emergenciesWithLocation.length;
+    }
+
     return (
       <View style={styles.mapContainer}>
-        <MapView
-          ref={mapRef}
-          provider={PROVIDER_GOOGLE}
-          style={styles.map}
+        {/* Cross-Platform Map */}
+        <CrossPlatformMap
           initialRegion={{
-            latitude: activeEmergencies[0]?.location.lat || 37.7749,
-            longitude: activeEmergencies[0]?.location.lng || -122.4194,
-            latitudeDelta: 0.1,
-            longitudeDelta: 0.1,
+            latitude: centerLat || 0,
+            longitude: centerLng || 0,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
           }}
+          style={styles.map}
         >
           {/* Patient Markers */}
-          {activeEmergencies.map((emergency) => (
+          {emergenciesWithLocation.map((emergency) => (
             <Marker
-              key={emergency._id}
+              key={`patient-${emergency._id}`}
               coordinate={{
                 latitude: emergency.location.lat,
                 longitude: emergency.location.lng,
               }}
-              title="Your Location"
-              description={`Emergency ${emergency._id.slice(-6)}`}
-              onPress={() => openModal(emergency)}
+              title="Emergency Location"
+              description={emergency.description || "Patient location"}
+              pinColor="#FF3B30"
             >
               <View style={styles.patientMarker}>
                 <Ionicons name="person" size={20} color="#FFF" />
@@ -415,21 +433,22 @@ export default function EmergenciesScreen() {
                   latitude: emergency.assignedAmbulance!.currentLocation!.coordinates[1],
                   longitude: emergency.assignedAmbulance!.currentLocation!.coordinates[0],
                 }}
-                title={`Ambulance ${emergency.assignedAmbulance!.vehicleNumber}`}
-                description={`ETA: ${emergency.estimatedArrival || "Calculating..."}`}
+                title="Ambulance"
+                description="En route"
+                pinColor="#34D399"
               >
                 <View style={styles.ambulanceMarker}>
-                  <Ionicons name="medical" size={24} color="#FFF" />
+                  <Ionicons name="medical" size={20} color="#FFF" />
                 </View>
               </Marker>
             ))}
-        </MapView>
+        </CrossPlatformMap>
 
         {/* Map Overlay Card */}
         <View style={styles.mapOverlay}>
           <Text style={styles.mapOverlayTitle}>Active Emergencies</Text>
           <Text style={styles.mapOverlaySubtitle}>
-            {activeEmergencies.length} active • Tap markers for details
+            {activeEmergencies.length} active emergency requests
           </Text>
         </View>
       </View>
@@ -490,25 +509,32 @@ export default function EmergenciesScreen() {
         animationType="none"
         onRequestClose={closeModal}
       >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity style={styles.modalBackdrop} onPress={closeModal} activeOpacity={1} />
-          
-          <Animated.View
-            style={[
-              styles.modalContent,
-              { transform: [{ translateY: slideAnim }] },
-            ]}
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={closeModal}
+        >
+          <TouchableOpacity 
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+            style={{ flex: 1, justifyContent: "flex-end" }}
           >
-            {/* Handle Bar */}
-            <View style={styles.modalHandle} />
-
-            <ScrollView
-              style={styles.modalScroll}
-              showsVerticalScrollIndicator={false}
-              bounces={false}
+            <Animated.View
+              style={[
+                styles.modalContent,
+                { transform: [{ translateY: slideAnim }] },
+              ]}
             >
-              {/* Header */}
-              <View style={styles.modalHeader}>
+              {/* Handle Bar */}
+              <View style={styles.modalHandle} />
+
+              <ScrollView
+                style={styles.modalScroll}
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+              >
+                {/* Header */}
+                <View style={styles.modalHeader}>
                 <View>
                   <Text style={styles.modalTitle}>Emergency Details</Text>
                   <Text style={styles.modalId}>ID: {selectedEmergency._id.slice(-12)}</Text>
@@ -691,7 +717,8 @@ export default function EmergenciesScreen() {
               <View style={{ height: 40 }} />
             </ScrollView>
           </Animated.View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     );
   };
@@ -879,12 +906,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 12,
-    gap: 6,
   },
   statusText: {
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 0.5,
+    marginLeft: 6,
   },
   timeText: {
     fontSize: 12,
@@ -930,12 +957,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     marginBottom: 12,
-    gap: 6,
   },
   etaText: {
     fontSize: 13,
     fontWeight: "600",
     color: "#3B82F6",
+    marginLeft: 6,
   },
   distanceText: {
     fontSize: 12,
@@ -991,6 +1018,31 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  mapPlaceholder: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F9FAFB",
+    padding: 24,
+  },
+  mapPlaceholderTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#374151",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  mapPlaceholderText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#6B7280",
+    marginBottom: 8,
+  },
+  mapPlaceholderHint: {
+    fontSize: 13,
+    color: "#9CA3AF",
+    textAlign: "center",
   },
   patientMarker: {
     width: 44,

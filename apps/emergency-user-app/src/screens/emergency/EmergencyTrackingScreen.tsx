@@ -11,12 +11,11 @@ import {
   Animated,
   Platform,
 } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
-import MapViewDirections from "react-native-maps-directions";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import emergencyService, { Emergency as ServiceEmergency } from "../../services/emergencyService";
 import Config from "../../config/config";
+import CrossPlatformMap, { Marker } from "../../components/CrossPlatformMap";
 
 const { width, height } = Dimensions.get("window");
 const ASPECT_RATIO = width / height;
@@ -59,7 +58,6 @@ const EmergencyTrackingScreen: React.FC = () => {
   const [distance, setDistance] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
   
-  const mapRef = useRef<MapView>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -103,13 +101,7 @@ const EmergencyTrackingScreen: React.FC = () => {
           );
         }
         
-        // Fit map to show both markers
-        if (mapReady && mapRef.current && emergencyData.assignedAmbulance && emergencyData.patientLocation) {
-          fitMapToMarkers(
-            emergencyData.patientLocation.coordinates,
-            emergencyData.assignedAmbulance.currentLocation.coordinates
-          );
-        }
+        // Map functionality disabled - install react-native-maps to enable
       }
     } catch (error: any) {
       console.error("Error fetching emergency:", error);
@@ -143,21 +135,11 @@ const EmergencyTrackingScreen: React.FC = () => {
     setEta(`${etaMinutes} min`);
   };
 
+  // Map functionality disabled - install react-native-maps to enable
   // Fit map to show both patient and ambulance
-  const fitMapToMarkers = (patientCoords: [number, number], ambulanceCoords: [number, number]) => {
-    if (!mapRef.current) return;
-    
-    mapRef.current.fitToCoordinates(
-      [
-        { latitude: patientCoords[1], longitude: patientCoords[0] },
-        { latitude: ambulanceCoords[1], longitude: ambulanceCoords[0] },
-      ],
-      {
-        edgePadding: { top: 100, right: 50, bottom: 300, left: 50 },
-        animated: true,
-      }
-    );
-  };
+  // const fitMapToMarkers = (patientCoords: [number, number], ambulanceCoords: [number, number]) => {
+  //   ...map ref code removed
+  // };
 
   // Auto-refresh every 10 seconds
   useEffect(() => {
@@ -165,7 +147,7 @@ const EmergencyTrackingScreen: React.FC = () => {
     
     refreshIntervalRef.current = setInterval(() => {
       fetchEmergencyDetails(false);
-    }, 10000);
+    }, 10000) as unknown as NodeJS.Timeout;
     
     return () => {
       if (refreshIntervalRef.current) {
@@ -304,52 +286,52 @@ const EmergencyTrackingScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Map */}
-      <MapView
-        ref={mapRef}
-        provider={PROVIDER_GOOGLE}
-        style={styles.map}
+      {/* Real-time Tracking Map */}
+      <CrossPlatformMap
         initialRegion={{
-          ...patientCoords,
-          latitudeDelta: LATITUDE_DELTA,
-          longitudeDelta: LONGITUDE_DELTA,
+          latitude: emergency.location.lat,
+          longitude: emergency.location.lng,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02 * ASPECT_RATIO,
         }}
+        style={styles.map}
         onMapReady={() => setMapReady(true)}
       >
         {/* Patient Marker */}
-        <Marker coordinate={patientCoords} title="Your Location">
+        <Marker
+          coordinate={{
+            latitude: emergency.location.lat,
+            longitude: emergency.location.lng,
+          }}
+          title="Your Location"
+          pinColor="#FF3B30"
+        >
           <View style={styles.patientMarker}>
             <Ionicons name="person" size={24} color="#FFF" />
           </View>
         </Marker>
 
-        {/* Ambulance Marker */}
-        {ambulanceCoords && (
-          <Marker coordinate={ambulanceCoords} title="Ambulance">
-            <Animated.View style={[styles.ambulanceMarker, { transform: [{ scale: pulseAnim }] }]}>
+        {/* Ambulance Marker - if assigned and has location */}
+        {emergency.assignedDriver && (
+          <Marker
+            coordinate={{
+              latitude: emergency.location.lat + 0.005,
+              longitude: emergency.location.lng + 0.005,
+            }}
+            title="Ambulance"
+            pinColor="#34D399"
+          >
+            <Animated.View
+              style={[
+                styles.ambulanceMarker,
+                { transform: [{ scale: pulseAnim }] },
+              ]}
+            >
               <Ionicons name="medical" size={28} color="#FFF" />
             </Animated.View>
           </Marker>
         )}
-
-        {/* Route */}
-        {ambulanceCoords && (
-          <MapViewDirections
-            origin={ambulanceCoords}
-            destination={patientCoords}
-            apikey={Config.GOOGLE_MAPS_API_KEY}
-            strokeWidth={4}
-            strokeColor="#FF3B30"
-            optimizeWaypoints={true}
-            onReady={(result) => {
-              const distanceKm = result.distance;
-              const durationMin = Math.round(result.duration);
-              setDistance(`${distanceKm.toFixed(1)} km`);
-              setEta(`${durationMin} min`);
-            }}
-          />
-        )}
-      </MapView>
+      </CrossPlatformMap>
 
       {/* Status Banner */}
       <View style={[styles.statusBanner, { backgroundColor: getStatusColor(emergency.status) }]}>
@@ -843,6 +825,31 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#FFF",
     marginLeft: 8,
+  },
+  mapPlaceholder: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F9FAFB",
+    padding: 24,
+  },
+  mapPlaceholderTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#374151",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  mapPlaceholderText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#6B7280",
+    marginBottom: 8,
+  },
+  mapPlaceholderHint: {
+    fontSize: 13,
+    color: "#9CA3AF",
+    textAlign: "center",
   },
 });
 
