@@ -475,6 +475,88 @@ class EmergencyService {
   private toRad(degrees: number): number {
     return degrees * (Math.PI / 180);
   }
+
+  /**
+   * Analyze symptoms using NLP AI service
+   */
+  async analyzeSymptoms(
+    symptoms: string,
+    patientInfo?: {
+      age?: number;
+      gender?: string;
+      medicalHistory?: string[];
+    }
+  ): Promise<any> {
+    try {
+      console.log('🔍 Analyzing symptoms with NLP...');
+
+      const response = await axios.post(
+        'http://localhost:3001/api/triage/analyze',
+        {
+          symptoms,
+          patientInfo: patientInfo || {},
+        },
+        {
+          timeout: 5000,
+        }
+      );
+
+      console.log('✅ NLP analysis complete');
+      return {
+        success: true,
+        data: response.data.analysis,
+      };
+    } catch (error: any) {
+      console.error('❌ NLP analysis error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to analyze symptoms',
+      };
+    }
+  }
+
+  /**
+   * Dispatch intelligent ambulance based on AI triage analysis
+   */
+  async dispatchIntelligentAmbulance(
+    triageResult: any,
+    userLocation: { lat: number; lng: number },
+    additionalData?: {
+      symptoms?: string;
+      description?: string;
+    }
+  ): Promise<EmergencyResponse> {
+    try {
+      console.log('🚑 Dispatching intelligent ambulance...');
+
+      const response = await this.api.post<EmergencyResponse>(
+        '/emergencies/dispatch-intelligent',
+        {
+          triageResult,
+          location: userLocation,
+          symptoms: additionalData?.symptoms || triageResult.detectedSymptoms?.map((s: any) => s.keyword) || [],
+          description: additionalData?.description || `AI-analyzed: ${triageResult.emergencyType}`,
+          severityLevel: triageResult.severity,
+          nlpAnalysis: triageResult.nlpInsights,
+        }
+      );
+
+      console.log('✅ Intelligent ambulance dispatched');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Dispatch error:', error.response?.data || error.message);
+
+      if (error.response?.data) {
+        return error.response.data;
+      }
+
+      return {
+        success: false,
+        message: error.message || 'Failed to dispatch ambulance',
+        errors: [error.message || 'Network error'],
+      };
+    }
+  }
 }
 
 export const emergencyService = new EmergencyService();

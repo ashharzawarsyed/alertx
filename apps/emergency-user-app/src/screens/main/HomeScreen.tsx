@@ -15,6 +15,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuthStore } from "../../store/authStore";
 import { emergencyService, Emergency } from "../../services/emergencyService";
+import { EmergencySymptomModal } from "../../components/EmergencySymptomModal";
+import { FirstAidGuide } from "../../components/FirstAidGuide";
+import { ambulanceDispatcher, DispatchedAmbulance } from "../../services/ambulanceDispatcher";
+import { TriageResult } from "../../services/symptomAnalyzer";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const SLIDER_WIDTH = SCREEN_WIDTH - 48; // 24px padding on each side
@@ -37,6 +41,12 @@ export default function HomeScreen() {
   const [emergencyContacts, setEmergencyContacts] = useState<
     EmergencyContact[]
   >([]);
+  
+  // NLP Integration States
+  const [showSymptomModal, setShowSymptomModal] = useState(false);
+  const [showFirstAidGuide, setShowFirstAidGuide] = useState(false);
+  const [triageResult, setTriageResult] = useState<TriageResult | null>(null);
+  const [dispatchedAmbulance, setDispatchedAmbulance] = useState<DispatchedAmbulance | null>(null);
 
   const pan = useRef(new Animated.Value(0)).current;
 
@@ -52,12 +62,13 @@ export default function HomeScreen() {
       },
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dx > MAX_TRANSLATE * 0.8) {
-          // Slide completed - trigger emergency
+          // Slide completed - show symptom modal
           Animated.spring(pan, {
             toValue: MAX_TRANSLATE,
             useNativeDriver: Platform.OS !== 'web',
           }).start(() => {
-            triggerEmergency();
+            // Show symptom modal for AI analysis
+            setShowSymptomModal(true);
             pan.setValue(0);
           });
         } else {
@@ -100,6 +111,64 @@ export default function HomeScreen() {
       setEmergencyContacts(contacts.slice(0, 4)); // Show max 4 contacts
     }
   }, [fetchActiveEmergency, user]);
+
+  // Handle symptom analysis completion
+  const handleAnalysisComplete = async (analysis: TriageResult) => {
+    console.log('🔬 Analysis received:', analysis);
+    setTriageResult(analysis);
+    setShowSymptomModal(false);
+
+    try {
+      // Mock user location (in production, get from GPS)
+      const userLocation = {
+        lat: 37.7749, // San Francisco coordinates
+        lng: -122.4194,
+      };
+
+      // Dispatch ambulance based on AI analysis
+      console.log('🚑 Dispatching ambulance...');
+      const ambulance = await ambulanceDispatcher.dispatchAmbulance(
+        analysis,
+        userLocation
+      );
+
+      setDispatchedAmbulance(ambulance);
+
+      // Trigger emergency in backend
+      const response = await emergencyService.triggerEmergencyButton(
+        `AI-analyzed emergency: ${analysis.emergencyType} (${analysis.severity} severity)`
+      );
+
+      if (response.success && response.data) {
+        setActiveEmergency(response.data.emergency);
+        
+        // Show first aid guide
+        setShowFirstAidGuide(true);
+        
+        Alert.alert(
+          "🚨 Emergency Dispatched",
+          `${ambulance.type} ambulance dispatched!\n\nETA: ${ambulance.eta} minutes\nVehicle: ${ambulance.vehicleNumber}\n\nSeverity: ${analysis.severity}\nConfidence: ${Math.round(analysis.confidence)}%`,
+          [
+            {
+              text: "View First Aid",
+              onPress: () => setShowFirstAidGuide(true),
+            },
+            {
+              text: "Track Ambulance",
+              onPress: () =>
+                router.push({
+                  pathname: "/emergency/tracking" as any,
+                  params: { emergencyId: response.data!.emergency._id },
+                }),
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('❌ Dispatch failed:', error);
+      Alert.alert('Error', 'Failed to dispatch ambulance. Please try again.');
+    }
+  };
 
   const triggerEmergency = async () => {
     // Double check for active emergency before proceeding
@@ -377,6 +446,24 @@ export default function HomeScreen() {
           </Text>
         </View>
       </View>
+
+      {/* NLP Integration Modals */}
+      <EmergencySymptomModal
+        visible={showSymptomModal}
+        onClose={() => setShowSymptomModal(false)}
+        onAnalysisComplete={handleAnalysisComplete}
+        userLocation={{ lat: 37.7749, lng: -122.4194 }}
+      />
+
+      {triageResult && (
+        <FirstAidGuide
+          visible={showFirstAidGuide}
+          onClose={() => setShowFirstAidGuide(false)}
+          emergencyType={triageResult.emergencyType}
+          severity={triageResult.severity}
+          ambulanceETA={dispatchedAmbulance?.eta}
+        />
+      )}
     </SafeAreaView>
   );
 }
