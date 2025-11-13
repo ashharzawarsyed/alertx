@@ -163,11 +163,77 @@ class KeywordMatcher {
     return results;
   }
 
+  /**
+   * NLP-enhanced analysis
+   * Uses NLP insights to improve keyword matching
+   */
+  analyzeWithNLP(symptomsText, nlpAnalysis) {
+    const results = {
+      critical: [],
+      urgent: [],
+      moderate: [],
+      mild: [],
+      matchedKeywords: [],
+      totalMatches: 0,
+    };
+
+    // Use expanded symptoms text from NLP
+    const textToMatch = nlpAnalysis.expandedSymptoms.expandedText;
+    const matchedSet = new Set();
+
+    // Get list of negated terms to exclude
+    const negatedTerms = nlpAnalysis.negations.negatedTerms;
+
+    // Check each category
+    for (const [severity, keywords] of Object.entries(MEDICAL_KEYWORDS)) {
+      const sortedKeywords = keywords.sort((a, b) => b.length - a.length);
+
+      for (const keyword of sortedKeywords) {
+        // Check if keyword is negated
+        const isNegated = negatedTerms.some(neg => 
+          keyword.toLowerCase().includes(neg) || neg.includes(keyword.toLowerCase())
+        );
+
+        // Only match if not negated and not already matched
+        if (!isNegated && textToMatch.includes(keyword) && !matchedSet.has(keyword)) {
+          // Apply severity multiplier from NLP
+          let adjustedSeverity = severity;
+          
+          // If NLP detected high severity modifiers, potentially upgrade severity
+          if (nlpAnalysis.severity.multiplier >= 1.8 && severity === 'moderate') {
+            adjustedSeverity = 'urgent';
+          } else if (nlpAnalysis.severity.multiplier >= 2.0 && severity === 'urgent') {
+            adjustedSeverity = 'critical';
+          }
+          
+          // If NLP detected reducers, potentially downgrade severity
+          if (nlpAnalysis.severity.multiplier <= 0.6 && severity === 'urgent') {
+            adjustedSeverity = 'moderate';
+          } else if (nlpAnalysis.severity.multiplier <= 0.5 && severity === 'critical') {
+            adjustedSeverity = 'urgent';
+          }
+
+          results[adjustedSeverity].push(keyword);
+          results.matchedKeywords.push({ 
+            keyword, 
+            severity: adjustedSeverity,
+            originalSeverity: severity,
+            nlpAdjusted: adjustedSeverity !== severity,
+          });
+          results.totalMatches++;
+          matchedSet.add(keyword);
+        }
+      }
+    }
+
+    return results;
+  }
+
   // Future enhancement: NLP integration point
-  async analyzeWithNLP(symptomsText) {
-    // This is where you'd integrate advanced NLP
+  async analyzeWithAdvancedNLP(symptomsText) {
+    // This is where you'd integrate advanced NLP models
     // For now, fallback to basic keyword matching
-    throw new Error("NLP analysis not implemented yet");
+    throw new Error("Advanced NLP analysis not implemented yet");
   }
 }
 

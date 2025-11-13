@@ -8,6 +8,7 @@ import {
   Animated,
   PanResponder,
   Dimensions,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -54,7 +55,7 @@ export default function HomeScreen() {
           // Slide completed - trigger emergency
           Animated.spring(pan, {
             toValue: MAX_TRANSLATE,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }).start(() => {
             triggerEmergency();
             pan.setValue(0);
@@ -63,7 +64,7 @@ export default function HomeScreen() {
           // Slide not completed - return to start
           Animated.spring(pan, {
             toValue: 0,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }).start();
         }
       },
@@ -101,10 +102,11 @@ export default function HomeScreen() {
   }, [fetchActiveEmergency, user]);
 
   const triggerEmergency = async () => {
+    // Double check for active emergency before proceeding
     if (activeEmergency) {
       Alert.alert(
         "Active Emergency",
-        "You already have an active emergency. Please wait for it to be completed.",
+        "You already have an active emergency. Tap the banner to track it.",
         [{ text: "OK" }]
       );
       return;
@@ -116,11 +118,25 @@ export default function HomeScreen() {
       );
 
       if (response.success && response.data) {
+        // Update active emergency state immediately
+        setActiveEmergency(response.data.emergency);
+        
         Alert.alert(
           "✅ Emergency Activated",
-          `Help is on the way!\n\nEmergency ID: ${response.data?.emergency._id}`,
-          [{ text: "OK" }]
+          `Help is on the way!\n\nEmergency ID: ${response.data.emergency._id?.slice(-6)}`,
+          [
+            {
+              text: "Track Emergency",
+              onPress: () =>
+                router.push({
+                  pathname: "/emergency/tracking" as any,
+                  params: { emergencyId: response.data!.emergency._id },
+                }),
+            },
+          ]
         );
+        
+        // Refresh emergency list
         fetchActiveEmergency();
       } else {
         Alert.alert(
@@ -129,6 +145,7 @@ export default function HomeScreen() {
         );
       }
     } catch (error: any) {
+      console.error("Emergency trigger error:", error);
       Alert.alert("Error", error.message || "Failed to activate emergency");
     }
   };
@@ -156,10 +173,16 @@ export default function HomeScreen() {
       <View style={styles.topBar}>
         <Text style={styles.appName}>AlertX</Text>
         <View style={styles.topIcons}>
-          <TouchableOpacity style={styles.iconButton}>
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={() => router.push("/notifications")}
+          >
             <Ionicons name="notifications-outline" size={24} color="#111827" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton}>
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={() => router.push("/settings")}
+          >
             <Ionicons name="settings-outline" size={24} color="#111827" />
           </TouchableOpacity>
         </View>
@@ -232,7 +255,16 @@ export default function HomeScreen() {
       <View style={styles.mainContent}>
         {/* Active Emergency Alert */}
         {activeEmergency && (
-          <View style={styles.activeEmergencyBanner}>
+          <TouchableOpacity
+            style={styles.activeEmergencyBanner}
+            onPress={() =>
+              router.push({
+                pathname: "/emergency/tracking" as any,
+                params: { emergencyId: activeEmergency._id },
+              })
+            }
+            activeOpacity={0.7}
+          >
             <View style={styles.activeEmergencyContent}>
               <Ionicons name="alert-circle" size={24} color="#DC2626" />
               <View style={styles.activeEmergencyText}>
@@ -240,11 +272,12 @@ export default function HomeScreen() {
                   Active Emergency
                 </Text>
                 <Text style={styles.activeEmergencySubtitle}>
-                  Status: {activeEmergency.status.replace("_", " ")}
+                  Status: {activeEmergency.status.replace("_", " ")} • Tap to track
                 </Text>
               </View>
+              <Ionicons name="chevron-forward" size={24} color="#DC2626" />
             </View>
-          </View>
+          </TouchableOpacity>
         )}
 
         {/* Quick Actions - Minimalist Design */}

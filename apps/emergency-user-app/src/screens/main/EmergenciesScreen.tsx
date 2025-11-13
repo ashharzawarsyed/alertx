@@ -11,12 +11,14 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { emergencyService, Emergency } from "../../services/emergencyService";
 import { useAuthStore } from "../../store/authStore";
 
 type FilterStatus = "all" | "active" | "completed" | "cancelled";
 
 export default function EmergenciesScreen() {
+  const router = useRouter();
   const { user } = useAuthStore();
   const [emergencies, setEmergencies] = useState<Emergency[]>([]);
   const [filteredEmergencies, setFilteredEmergencies] = useState<Emergency[]>(
@@ -81,11 +83,20 @@ export default function EmergenciesScreen() {
   };
 
   const handleEmergencyPress = (emergency: Emergency) => {
-    Alert.alert(
-      "Emergency Details",
-      `ID: ${emergency._id}\n\nStatus: ${emergency.status.replace("_", " ").toUpperCase()}\nSeverity: ${emergency.severityLevel.toUpperCase()}\nTriage Score: ${emergency.triageScore}/10\n\nSymptoms:\n${emergency.symptoms.map((s) => `• ${s}`).join("\n")}\n\nLocation: ${emergency.location.address || "Address not available"}`,
-      [{ text: "OK" }]
-    );
+    // Navigate to tracking screen for active emergencies
+    if (["pending", "accepted", "in_progress"].includes(emergency.status)) {
+      router.push({
+        pathname: "/emergency/tracking" as any,
+        params: { emergencyId: emergency._id },
+      });
+    } else {
+      // Show details alert for completed/cancelled emergencies
+      Alert.alert(
+        "Emergency Details",
+        `ID: ${emergency._id}\n\nStatus: ${emergency.status.replace("_", " ").toUpperCase()}\nSeverity: ${emergency.severityLevel.toUpperCase()}\nTriage Score: ${emergency.triageScore}/10\n\nSymptoms:\n${emergency.symptoms.map((s) => `• ${s}`).join("\n")}\n\nLocation: ${emergency.location.address || "Address not available"}`,
+        [{ text: "OK" }]
+      );
+    }
   };
 
   const filters: { key: FilterStatus; label: string; icon: string }[] = [

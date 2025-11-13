@@ -1,30 +1,7 @@
 import { Alert, Platform } from "react-native";
+import Config from "../config/config";
 
-// API configuration for different platforms and environments
-const getApiBaseUrl = () => {
-  if (__DEV__) {
-    // IMPORTANT: Update this IP address to match your computer's local network IP
-    // Find it by running: ipconfig (Windows) or ifconfig (Mac/Linux)
-    const LOCAL_NETWORK_IP = "192.168.100.23"; // Your computer's LAN IP
-
-    // For Android emulator, use 10.0.2.2 to reach host machine
-    // For real Android devices via Expo Go, use your computer's LAN IP
-    if (Platform.OS === "android") {
-      // Try to detect if running on emulator vs real device
-      // Real devices need your computer's LAN IP, emulators use 10.0.2.2
-      // Since Expo Go is typically used on real devices, we'll use LAN IP
-      return `http://${LOCAL_NETWORK_IP}:5001/api/v1`;
-
-      // If using Android emulator (not Expo Go), uncomment this:
-      // return "http://10.0.2.2:5001/api/v1";
-    }
-    // For iOS simulator, use localhost
-    return "http://localhost:5001/api/v1";
-  }
-  return "https://api.alertx.com/api/v1"; // Production - replace with actual domain
-};
-
-const API_BASE_URL = getApiBaseUrl();
+const API_BASE_URL = Config.API_URL;
 
 export interface SignUpData {
   email: string;

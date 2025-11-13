@@ -1,15 +1,7 @@
 import axios, { AxiosInstance } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
-
-// Get backend URL based on environment
-const getBaseURL = () => {
-  if (__DEV__) {
-    // For local development
-    return "http://192.168.100.23:5001/api/v1"; // Works on real devices
-  }
-  return "https://your-production-api.com/api/v1";
-};
+import Config from "../config/config";
 
 export interface EmergencyData {
   symptoms: string[];
@@ -91,7 +83,7 @@ class EmergencyService {
   private baseURL: string;
 
   constructor() {
-    this.baseURL = getBaseURL();
+    this.baseURL = Config.API_URL;
     this.api = axios.create({
       baseURL: this.baseURL,
       timeout: 25000,
@@ -396,6 +388,92 @@ class EmergencyService {
       console.error("❌ Get active emergency error:", error);
       return null;
     }
+  }
+
+  /**
+   * Get emergency details with driver and hospital info
+   */
+  async getEmergencyDetails(
+    emergencyId: string
+  ): Promise<EmergencyResponse> {
+    try {
+      console.log("🔍 Fetching emergency details:", emergencyId);
+
+      const response = await this.api.get<EmergencyResponse>(
+        `/emergencies/${emergencyId}`
+      );
+
+      console.log("✅ Emergency details fetched");
+      return response.data;
+    } catch (error: any) {
+      console.error(
+        "❌ Get emergency details error:",
+        error.response?.data || error.message
+      );
+
+      if (error.response?.data) {
+        return error.response.data;
+      }
+
+      return {
+        success: false,
+        message: error.message || "Failed to fetch emergency details",
+        errors: [error.message || "Network error"],
+      };
+    }
+  }
+
+  /**
+   * Get driver's current location (simulated for now)
+   * TODO: Replace with Socket.IO or polling when backend supports it
+   */
+  async getDriverLocation(
+    driverId: string
+  ): Promise<{ lat: number; lng: number } | null> {
+    try {
+      // In production, this would be a real-time API or Socket.IO
+      // For now, we'll simulate driver location near the patient
+      console.log("📍 Getting driver location (simulated):", driverId);
+
+      // Return simulated location
+      // TODO: Implement actual driver location tracking
+      return null;
+    } catch (error) {
+      console.error("❌ Get driver location error:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Calculate ETA based on current locations
+   */
+  calculateETA(
+    driverLocation: { lat: number; lng: number },
+    patientLocation: { lat: number; lng: number }
+  ): number {
+    // Simple distance calculation using Haversine formula
+    const R = 6371; // Earth's radius in km
+    const dLat = this.toRad(patientLocation.lat - driverLocation.lat);
+    const dLng = this.toRad(patientLocation.lng - driverLocation.lng);
+
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.toRad(driverLocation.lat)) *
+        Math.cos(this.toRad(patientLocation.lat)) *
+        Math.sin(dLng / 2) *
+        Math.sin(dLng / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c;
+
+    // Assume average speed of 40 km/h in city
+    const eta = (distance / 40) * 60; // Convert to minutes
+
+    return Math.round(eta);
+  }
+
+  private toRad(degrees: number): number {
+    return degrees * (Math.PI / 180);
   }
 }
 

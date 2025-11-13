@@ -9,6 +9,7 @@ import {
   StatusBar,
   TouchableOpacity,
   Animated,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -103,10 +104,16 @@ export default function EnhancedSignInScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
-        <View style={styles.contentWrapper}>
-          {/* Form Container */}
-          <SafeAreaView edges={["bottom"]} style={styles.formSafeArea}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.contentWrapper}>
+            {/* Form Container */}
+            <SafeAreaView edges={["bottom"]} style={styles.formSafeArea}>
             <Animated.View
               style={[
                 styles.formContainer,
@@ -213,6 +220,7 @@ export default function EnhancedSignInScreen() {
             </Animated.View>
           </SafeAreaView>
         </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );

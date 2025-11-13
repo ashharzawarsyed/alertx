@@ -1,6 +1,7 @@
 import "dotenv/config";
 import app from "./app.js";
 import mongoose from "mongoose";
+import { startScheduler } from "./services/schedulerService.js";
 
 const PORT = process.env.PORT || 5000;
 
@@ -14,6 +15,9 @@ const server = app.listen(PORT, "0.0.0.0", () => {
   📊 Health: http://localhost:${PORT}/
   🔗 Emulator: http://10.0.2.2:${PORT}
   `);
+  
+  // Start the emergency timeout scheduler
+  startScheduler();
 });
 
 /**

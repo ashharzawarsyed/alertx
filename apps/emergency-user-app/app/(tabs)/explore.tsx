@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   TextInput,
   RefreshControl,
   Linking,
+  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,11 +26,17 @@ import HospitalCard from "@/src/components/explore/HospitalCard";
 import HealthTipCard from "@/src/components/explore/HealthTipCard";
 import FirstAidCard from "@/src/components/explore/FirstAidCard";
 import PreparednessCard from "@/src/components/explore/PreparednessCard";
+import Config from "@/src/config/config";
+import CrossPlatformMap, { Marker } from "@/src/components/CrossPlatformMap";
 
 type TabType = "hospitals" | "health" | "firstaid" | "preparedness";
+type HospitalViewMode = "list" | "map";
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function ExploreScreen() {
   const [activeTab, setActiveTab] = useState<TabType>("hospitals");
+  const [hospitalViewMode, setHospitalViewMode] = useState<HospitalViewMode>("list");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -326,6 +333,52 @@ export default function ExploreScreen() {
               </View>
             )}
 
+            {/* View Mode Toggle */}
+            <View style={styles.viewModeContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.viewModeButton,
+                  hospitalViewMode === "list" && styles.viewModeActive,
+                ]}
+                onPress={() => setHospitalViewMode("list")}
+              >
+                <Ionicons
+                  name="list"
+                  size={20}
+                  color={hospitalViewMode === "list" ? "#FFF" : "#6B7280"}
+                />
+                <Text
+                  style={[
+                    styles.viewModeText,
+                    hospitalViewMode === "list" && styles.viewModeTextActive,
+                  ]}
+                >
+                  List
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.viewModeButton,
+                  hospitalViewMode === "map" && styles.viewModeActive,
+                ]}
+                onPress={() => setHospitalViewMode("map")}
+              >
+                <Ionicons
+                  name="map"
+                  size={20}
+                  color={hospitalViewMode === "map" ? "#FFF" : "#6B7280"}
+                />
+                <Text
+                  style={[
+                    styles.viewModeText,
+                    hospitalViewMode === "map" && styles.viewModeTextActive,
+                  ]}
+                >
+                  Map
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             {!filteredHospitals || filteredHospitals.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="business-outline" size={64} color="#D1D5DB" />
@@ -336,7 +389,7 @@ export default function ExploreScreen() {
                     : "No hospitals found in your area"}
                 </Text>
               </View>
-            ) : (
+            ) : hospitalViewMode === "list" ? (
               Array.isArray(filteredHospitals) &&
               filteredHospitals.map((hospital) => (
                 <HospitalCard
@@ -347,6 +400,59 @@ export default function ExploreScreen() {
                   }}
                 />
               ))
+            ) : (
+              <View style={styles.mapWrapper}>
+                {/* Hospital Map */}
+                <CrossPlatformMap
+                  initialRegion={{
+                    latitude: userLocation?.latitude || 0,
+                    longitude: userLocation?.longitude || 0,
+                    latitudeDelta: 0.05,
+                    longitudeDelta: 0.05,
+                  }}
+                  style={styles.hospitalMap}
+                >
+                  {/* User Location Marker */}
+                  {userLocation && (
+                    <Marker
+                      coordinate={userLocation}
+                      title="Your Location"
+                      pinColor="#3B82F6"
+                    >
+                      <View style={styles.userMarker}>
+                        <Ionicons name="location" size={20} color="#FFF" />
+                      </View>
+                    </Marker>
+                  )}
+
+                  {/* Hospital Markers */}
+                  {filteredHospitals.map((hospital) => (
+                    <Marker
+                      key={hospital._id}
+                      coordinate={{
+                        latitude: hospital.location.lat,
+                        longitude: hospital.location.lng,
+                      }}
+                      title={hospital.name}
+                      description={hospital.address}
+                      pinColor="#FF3B30"
+                    >
+                      <View style={styles.hospitalMarker}>
+                        <Ionicons name="medical" size={20} color="#FFF" />
+                      </View>
+                    </Marker>
+                  ))}
+                </CrossPlatformMap>
+
+                <View style={styles.mapInfoCard}>
+                  <Text style={styles.mapInfoTitle}>
+                    {filteredHospitals.length} Hospital{filteredHospitals.length !== 1 ? "s" : ""} Nearby
+                  </Text>
+                  <Text style={styles.mapInfoSubtitle}>
+                    Tap markers for details
+                  </Text>
+                </View>
+              </View>
             )}
           </>
         )}
@@ -652,5 +758,122 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#9CA3AF",
     textAlign: "center",
+  },
+  viewModeContainer: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 16,
+  },
+  viewModeButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    gap: 6,
+  },
+  viewModeActive: {
+    backgroundColor: "#111827",
+  },
+  viewModeText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#6B7280",
+  },
+  viewModeTextActive: {
+    color: "#FFFFFF",
+  },
+  mapWrapper: {
+    height: SCREEN_HEIGHT * 0.6,
+    borderRadius: 16,
+    overflow: "hidden",
+    marginBottom: 16,
+    position: "relative",
+  },
+  hospitalMap: {
+    flex: 1,
+    backgroundColor: "#F9FAFB",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  mapPlaceholderContent: {
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  mapPlaceholderTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#374151",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  mapPlaceholderText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#6B7280",
+    marginBottom: 8,
+  },
+  mapPlaceholderHint: {
+    fontSize: 13,
+    color: "#9CA3AF",
+    textAlign: "center",
+  },
+  userMarker: {
+    width: 48,
+    height: 48,
+    backgroundColor: "#3B82F6",
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 3,
+    borderColor: "#FFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  hospitalMarker: {
+    width: 48,
+    height: 48,
+    backgroundColor: "#EF4444",
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 3,
+    borderColor: "#FFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  mapInfoCard: {
+    position: "absolute",
+    top: 16,
+    left: 16,
+    right: 16,
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  mapInfoTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 4,
+  },
+  mapInfoSubtitle: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#6B7280",
   },
 });

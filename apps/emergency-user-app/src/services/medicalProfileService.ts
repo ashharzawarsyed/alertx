@@ -1,13 +1,6 @@
 import axios, { AxiosInstance } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-// Get backend URL based on environment
-const getBaseURL = () => {
-  if (__DEV__) {
-    return "http://192.168.100.23:5001/api/v1";
-  }
-  return "https://your-production-api.com/api/v1";
-};
+import Config from "../config/config";
 
 // Types for Medical Profile
 export interface BasicMedicalInfo {
@@ -167,7 +160,7 @@ class MedicalProfileService {
   private baseURL: string;
 
   constructor() {
-    this.baseURL = getBaseURL();
+    this.baseURL = Config.API_URL;
     this.api = axios.create({
       baseURL: this.baseURL,
       timeout: 30000,
