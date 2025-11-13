@@ -1,20 +1,19 @@
 import axios, { AxiosInstance, AxiosResponse } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ApiResponse } from "../types";
+import Config from "../config/config";
 
 class ApiService {
   private api: AxiosInstance;
   private baseURL: string;
 
   constructor() {
-    // Use your backend URL here - replace with actual backend URL
-    this.baseURL = __DEV__
-      ? "http://192.168.100.23:5001/api/v1"
-      : "https://your-production-api.com/api/v1";
+    // Use dynamic API URL from config
+    this.baseURL = Config.API_URL;
 
     this.api = axios.create({
       baseURL: this.baseURL,
-      timeout: 10000,
+      timeout: Config.API_TIMEOUT,
       headers: {
         "Content-Type": "application/json",
       },
