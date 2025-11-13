@@ -7,6 +7,7 @@ import {
   acceptEmergency,
   updateEmergencyStatus,
   addNote,
+  dispatchIntelligentAmbulance,
 } from "../controllers/emergencyController.js";
 import {
   validateEmergencyRequest,
@@ -40,6 +41,18 @@ router.post(
   authenticate,
   authorize(USER_ROLES.PATIENT),
   emergencyButton
+);
+
+/**
+ * @route   POST /api/v1/emergencies/dispatch-intelligent
+ * @desc    Dispatch intelligent ambulance based on AI triage analysis
+ * @access  Private (Patients only)
+ */
+router.post(
+  "/dispatch-intelligent",
+  authenticate,
+  authorize(USER_ROLES.PATIENT),
+  dispatchIntelligentAmbulance
 );
 
 /**

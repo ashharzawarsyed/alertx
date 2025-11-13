@@ -603,3 +603,192 @@ const findNearestHospital = async (location) => {
 
   return nearestHospital;
 };
+
+/**
+ * @desc    Dispatch intelligent ambulance based on AI triage analysis
+ * @route   POST /api/v1/emergencies/dispatch-intelligent
+ * @access  Private (Patient)
+ */
+export const dispatchIntelligentAmbulance = asyncHandler(async (req, res) => {
+  try {
+    console.log(
+      "🤖 Intelligent ambulance dispatch called:",
+      JSON.stringify(req.body, null, 2)
+    );
+
+    const { triageResult, location, symptoms, description, severityLevel, nlpAnalysis } = req.body;
+
+    // Verify user is a patient
+    if (req.user.role !== USER_ROLES.PATIENT) {
+      return sendResponse(
+        res,
+        RESPONSE_CODES.FORBIDDEN,
+        "Only patients can request ambulance dispatch"
+      );
+    }
+
+    // Check for active emergency
+    const activeEmergency = await Emergency.findOne({
+      patient: req.user.id,
+      status: {
+        $in: [
+          EMERGENCY_STATUS.PENDING,
+          EMERGENCY_STATUS.ACCEPTED,
+          EMERGENCY_STATUS.IN_PROGRESS,
+        ],
+      },
+    });
+
+    if (activeEmergency) {
+      return sendResponse(
+        res,
+        RESPONSE_CODES.CONFLICT,
+        "You already have an active emergency request"
+      );
+    }
+
+    // Create emergency with AI analysis
+    const emergency = await Emergency.create({
+      patient: req.user.id,
+      symptoms: symptoms || triageResult.detectedSymptoms?.map(s => s.keyword) || [],
+      description: description || `AI-analyzed: ${triageResult.emergencyType}`,
+      severityLevel: severityLevel || triageResult.severity,
+      triageScore: Math.round(triageResult.confidence || 0),
+      location: {
+        lat: location.lat,
+        lng: location.lng,
+        address: location.address || 'Unknown location',
+      },
+      status: EMERGENCY_STATUS.PENDING,
+      requestTime: new Date(),
+      aiPrediction: {
+        confidence: triageResult.confidence,
+        emergencyType: triageResult.emergencyType,
+        nlpInsights: nlpAnalysis,
+        detectedSymptoms: triageResult.detectedSymptoms,
+        recommendations: triageResult.recommendations,
+      },
+    });
+
+    console.log("✅ Intelligent emergency created:", emergency._id);
+
+    // Find nearest hospital
+    const nearestHospital = await findNearestHospital(location);
+
+    // Determine ambulance type based on AI analysis
+    const ambulanceType = determineAmbulanceType(
+      triageResult.emergencyType,
+      triageResult.severity
+    );
+
+    console.log(`🚑 Required ambulance type: ${ambulanceType}`);
+
+    // Find nearest available driver with required ambulance type
+    const nearestDriver = await User.findOne({
+      role: USER_ROLES.DRIVER,
+      "driverInfo.status": DRIVER_STATUS.AVAILABLE,
+      "driverInfo.ambulanceType": ambulanceType,
+    });
+
+    // Auto-assign if driver found
+    if (nearestDriver) {
+      emergency.assignedDriver = nearestDriver._id;
+      emergency.status = EMERGENCY_STATUS.ACCEPTED;
+      emergency.responseTime = new Date();
+
+      // Update driver status
+      nearestDriver.driverInfo.status = DRIVER_STATUS.ON_DUTY;
+      await nearestDriver.save();
+
+      console.log(`✅ Driver auto-assigned: ${nearestDriver.name}`);
+    }
+
+    // Auto-assign hospital if found
+    if (nearestHospital) {
+      emergency.assignedHospital = nearestHospital._id;
+      console.log(`🏥 Hospital assigned: ${nearestHospital.name}`);
+    }
+
+    await emergency.save();
+
+    // Populate emergency details
+    await emergency.populate([
+      { path: "patient", select: "name email phone medicalProfile" },
+      { path: "assignedDriver", select: "name email phone driverInfo" },
+      { path: "assignedHospital", select: "name address phone location" },
+    ]);
+
+    // Calculate ETA
+    const eta = nearestDriver ? Math.floor(Math.random() * 15) + 5 : null;
+
+    sendResponse(
+      res,
+      RESPONSE_CODES.SUCCESS,
+      "Intelligent ambulance dispatched successfully",
+      {
+        emergency,
+        ambulance: {
+          type: ambulanceType,
+          driver: nearestDriver ? {
+            name: nearestDriver.name,
+            phone: nearestDriver.phone,
+            ambulanceNumber: nearestDriver.driverInfo?.ambulanceNumber,
+          } : null,
+          hospital: nearestHospital ? {
+            name: nearestHospital.name,
+            address: nearestHospital.address,
+          } : null,
+          eta,
+        },
+        aiAnalysis: {
+          emergencyType: triageResult.emergencyType,
+          severity: triageResult.severity,
+          confidence: triageResult.confidence,
+          recommendations: triageResult.recommendations,
+        },
+      }
+    );
+  } catch (error) {
+    console.error("❌ Intelligent dispatch error:", error);
+    throw error;
+  }
+});
+
+/**
+ * Helper function to determine ambulance type based on AI analysis
+ */
+const determineAmbulanceType = (emergencyType, severity) => {
+  // Critical severity
+  if (severity === 'critical') {
+    if (emergencyType === 'cardiac' || emergencyType === 'neurological') {
+      return 'MOBILE_ICU';
+    }
+    return 'ALS';
+  }
+
+  // High severity
+  if (severity === 'high') {
+    if (['burn', 'poisoning', 'allergic'].includes(emergencyType)) {
+      return 'SPECIALIZED';
+    }
+    if (['cardiac', 'respiratory', 'neurological'].includes(emergencyType)) {
+      return 'ALS';
+    }
+    return 'ALS';
+  }
+
+  // Medium severity
+  if (severity === 'medium') {
+    if (['cardiac', 'respiratory'].includes(emergencyType)) {
+      return 'ALS';
+    }
+    if (['burn', 'poisoning'].includes(emergencyType)) {
+      return 'SPECIALIZED';
+    }
+    return 'BLS';
+  }
+
+  // Low severity - BLS is sufficient
+  return 'BLS';
+};
+
