@@ -36,11 +36,74 @@ class ScoringService {
     return "low";
   }
 
+  /**
+   * Calculate severity with NLP enhancements
+   */
+  calculateSeverityWithNLP(keywordAnalysis, nlpAnalysis, patientInfo = {}) {
+    // Start with base severity
+    let baseSeverity = this.calculateSeverity(keywordAnalysis, patientInfo);
+    
+    const { critical, urgent, moderate } = keywordAnalysis;
+    const severityMultiplier = nlpAnalysis.severity.multiplier;
+    const temporalOnset = nlpAnalysis.temporal.onset;
+    const distressLevel = nlpAnalysis.sentiment.distressLevel;
+
+    // Convert severity to numeric score for adjustment
+    let severityScore = this.severityToScore(baseSeverity);
+
+    // Apply NLP-based adjustments
+    
+    // 1. Severity multiplier from intensifiers/reducers
+    severityScore *= severityMultiplier;
+
+    // 2. Temporal factors (acute onset increases severity)
+    if (temporalOnset === 'acute') {
+      severityScore *= 1.2; // 20% increase for sudden onset
+      
+      // Acute + critical keywords = definitely critical
+      if (critical.length > 0) {
+        return 'critical';
+      }
+    }
+
+    // 3. Emotional distress (high distress + symptoms = higher severity)
+    if (distressLevel === 'high') {
+      severityScore *= 1.15; // 15% increase for high distress
+    }
+
+    // 4. Multiple body parts affected
+    if (nlpAnalysis.entities.bodyParts.length >= 3) {
+      severityScore *= 1.1; // 10% increase for multiple affected areas
+    }
+
+    // 5. Chronic symptoms with sudden worsening
+    if (temporalOnset === 'chronic' && critical.length > 0) {
+      // Chronic condition with critical symptoms = immediate attention
+      severityScore *= 1.3;
+    }
+
+    // Convert back to severity level
+    return this.scoreToSeverity(severityScore);
+  }
+
+  /**
+   * Convert severity level to numeric score
+   */
+  severityToScore(severity) {
+    const scoreMap = {
+      'critical': 100,
+      'high': 60,
+      'medium': 30,
+      'low': 10,
+    };
+    return scoreMap[severity] || 10;
+  }
+
   scoreToSeverity(score) {
-    // Legacy method - keeping for backward compatibility
-    if (score >= 100) return "critical";
-    if (score >= 50) return "high";
-    if (score >= 25) return "medium";
+    // More conservative thresholds with NLP adjustments
+    if (score >= 80) return "critical";
+    if (score >= 45) return "high";
+    if (score >= 20) return "medium";
     return "low";
   }
 
