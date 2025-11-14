@@ -55,7 +55,7 @@ export default function HomeScreen() {
           // Slide completed - trigger emergency
           Animated.spring(pan, {
             toValue: MAX_TRANSLATE,
-            useNativeDriver: Platform.OS !== 'web',
+            useNativeDriver: Platform.OS !== "web",
           }).start(() => {
             triggerEmergency();
             pan.setValue(0);
@@ -64,7 +64,7 @@ export default function HomeScreen() {
           // Slide not completed - return to start
           Animated.spring(pan, {
             toValue: 0,
-            useNativeDriver: Platform.OS !== 'web',
+            useNativeDriver: Platform.OS !== "web",
           }).start();
         }
       },
@@ -120,7 +120,7 @@ export default function HomeScreen() {
       if (response.success && response.data) {
         // Update active emergency state immediately
         setActiveEmergency(response.data.emergency);
-        
+
         Alert.alert(
           "✅ Emergency Activated",
           `Help is on the way!\n\nEmergency ID: ${response.data.emergency._id?.slice(-6)}`,
@@ -135,7 +135,7 @@ export default function HomeScreen() {
             },
           ]
         );
-        
+
         // Refresh emergency list
         fetchActiveEmergency();
       } else {
@@ -173,13 +173,13 @@ export default function HomeScreen() {
       <View style={styles.topBar}>
         <Text style={styles.appName}>AlertX</Text>
         <View style={styles.topIcons}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.iconButton}
             onPress={() => router.push("/notifications" as any)}
           >
             <Ionicons name="notifications-outline" size={24} color="#111827" />
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.iconButton}
             onPress={() => router.push("/settings" as any)}
           >
@@ -272,7 +272,8 @@ export default function HomeScreen() {
                   Active Emergency
                 </Text>
                 <Text style={styles.activeEmergencySubtitle}>
-                  Status: {activeEmergency.status.replace("_", " ")} • Tap to track
+                  Status: {activeEmergency.status.replace("_", " ")} • Tap to
+                  track
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={24} color="#DC2626" />

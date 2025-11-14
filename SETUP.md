@@ -11,6 +11,7 @@ Before you start, make sure you have the following installed:
 - **Expo CLI** - Install with `npm install -g expo-cli`
 
 ### Optional but Recommended:
+
 - **Yarn** - Install with `npm install -g yarn`
 - **VS Code** - [Download](https://code.visualstudio.com/)
 - **Expo Go App** - [iOS](https://apps.apple.com/app/expo-go/id982107779) | [Android](https://play.google.com/store/apps/details?id=host.exp.exponent)
@@ -39,29 +40,34 @@ yarn install
 **IMPORTANT:** The project uses environment variables for configuration. You need to create `.env` files from the provided templates.
 
 #### Root Configuration
+
 ```bash
 cp .env.example .env
 ```
 
 Edit `.env` and fill in:
+
 - `MONGO_URI` - Your MongoDB connection string (Ask team lead)
 - `GLOBAL_JWT_SECRET` - JWT secret key (Ask team lead)
 - `MAPBOX_ACCESS_TOKEN` - Get from [Mapbox](https://www.mapbox.com/)
 - `GOOGLE_MAPS_API_KEY` - Get from [Google Cloud Console](https://console.cloud.google.com/)
 
 #### Backend Service
+
 ```bash
 cd apps/backend
 cp .env.example .env
 ```
 
 **Critical backend variables:**
+
 - `MONGO_URI` - MongoDB connection string
 - `JWT_SECRET` - Same as root JWT secret
 - `EMAIL_USER` & `EMAIL_PASS` - Gmail credentials (see `GMAIL_SETUP.md`)
 - `CLOUDINARY_*` - For file uploads (optional for testing)
 
 #### AI Service
+
 ```bash
 cd apps/ai-service
 cp .env.example .env
@@ -70,6 +76,7 @@ cp .env.example .env
 Set `PORT=8000` or your preferred port.
 
 #### Dashboard (Admin)
+
 ```bash
 cd apps/dashboard
 cp .env.example .env
@@ -78,6 +85,7 @@ cp .env.example .env
 Update `VITE_API_URL` to match your backend URL.
 
 #### Hospital Dashboard
+
 ```bash
 cd apps/hospital-dashboard
 cp .env.example .env
@@ -90,12 +98,14 @@ Update `VITE_API_URL` to match your backend URL.
 ### 4️⃣ Install Service Dependencies
 
 #### Backend Service
+
 ```bash
 cd apps/backend
 npm install
 ```
 
 #### AI Service
+
 ```bash
 cd apps/ai-service
 npm install  # Node.js dependencies
@@ -103,24 +113,28 @@ pip install -r requirements.txt  # Python dependencies
 ```
 
 #### Admin Dashboard
+
 ```bash
 cd apps/dashboard
 npm install
 ```
 
 #### Hospital Dashboard
+
 ```bash
 cd apps/hospital-dashboard
 npm install
 ```
 
 #### Emergency User App (React Native)
+
 ```bash
 cd apps/emergency-user-app
 npm install
 ```
 
 #### Emergency Driver App (React Native)
+
 ```bash
 cd apps/emergency-driver-app
 npm install
@@ -133,6 +147,7 @@ npm install
 ### Option 1: Run All Services (Recommended)
 
 From the root directory:
+
 ```bash
 npm run dev
 ```
@@ -142,6 +157,7 @@ This will start all services concurrently.
 ### Option 2: Run Services Individually
 
 #### Backend Server
+
 ```bash
 cd apps/backend
 npm run dev
@@ -149,6 +165,7 @@ npm run dev
 ```
 
 #### AI Service
+
 ```bash
 cd apps/ai-service
 npm start
@@ -156,6 +173,7 @@ npm start
 ```
 
 #### Admin Dashboard
+
 ```bash
 cd apps/dashboard
 npm run dev
@@ -163,6 +181,7 @@ npm run dev
 ```
 
 #### Hospital Dashboard
+
 ```bash
 cd apps/hospital-dashboard
 npm run dev
@@ -170,6 +189,7 @@ npm run dev
 ```
 
 #### Emergency User App (Mobile)
+
 ```bash
 cd apps/emergency-user-app
 npx expo start
@@ -177,6 +197,7 @@ npx expo start
 ```
 
 #### Emergency Driver App (Mobile)
+
 ```bash
 cd apps/emergency-driver-app
 npx expo start
@@ -234,17 +255,20 @@ alertx/
 ## 🔑 Getting Required Credentials
 
 ### MongoDB Atlas (Database)
+
 1. Go to [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
 2. Create a free cluster
 3. Get your connection string
 4. **Ask team lead** for the actual project database credentials
 
 ### Mapbox (Maps & Location)
+
 1. Sign up at [Mapbox](https://www.mapbox.com/)
 2. Get your access token from the dashboard
 3. Add to `.env` files
 
 ### Google Maps API
+
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project
 3. Enable Maps JavaScript API
@@ -252,11 +276,13 @@ alertx/
 5. Add to `.env` files
 
 ### Gmail (Email Notifications)
+
 1. Enable 2-Factor Authentication on your Gmail
 2. Generate an App Password
 3. See `apps/backend/GMAIL_SETUP.md` for detailed instructions
 
 ### Cloudinary (Optional - File Uploads)
+
 1. Sign up at [Cloudinary](https://cloudinary.com/)
 2. Get your cloud name, API key, and secret
 3. Add to backend `.env`
@@ -266,10 +292,13 @@ alertx/
 ## ⚠️ Common Issues & Solutions
 
 ### Issue: "Cannot connect to MongoDB"
+
 **Solution:** Check your `MONGO_URI` in `.env`. Ask team lead for correct credentials.
 
 ### Issue: "Port already in use"
-**Solution:** 
+
+**Solution:**
+
 ```bash
 # Kill process on port 5000 (backend)
 npx kill-port 5000
@@ -278,7 +307,9 @@ npx kill-port 5000
 ```
 
 ### Issue: "Module not found" errors
+
 **Solution:**
+
 ```bash
 # Clear node_modules and reinstall
 rm -rf node_modules package-lock.json
@@ -286,13 +317,16 @@ npm install
 ```
 
 ### Issue: Expo app won't start
+
 **Solution:**
+
 ```bash
 cd apps/emergency-user-app
 npx expo start --clear
 ```
 
 ### Issue: Backend throws JWT errors
+
 **Solution:** Make sure `JWT_SECRET` in `apps/backend/.env` matches `GLOBAL_JWT_SECRET` in root `.env`
 
 ---
@@ -300,12 +334,14 @@ npx expo start --clear
 ## 🧪 Testing
 
 ### Backend Tests
+
 ```bash
 cd apps/backend
 npm test
 ```
 
 ### AI Service Tests
+
 ```bash
 cd apps/ai-service
 npm test
@@ -316,11 +352,13 @@ npm test
 ## 👥 Team Collaboration
 
 ### Shared Settings
+
 - `.vscode` folder is tracked for shared editor settings
 - Install recommended VS Code extensions when prompted
 - Use the same code formatting (ESLint + Prettier)
 
 ### Git Workflow
+
 1. Always pull latest changes: `git pull origin main`
 2. Create feature branches: `git checkout -b feature/your-feature`
 3. Commit often with clear messages
@@ -328,6 +366,7 @@ npm test
 5. Create Pull Request on GitHub
 
 ### Code Style
+
 - Use ESLint for JavaScript/TypeScript
 - Follow existing code patterns
 - Add comments for complex logic
@@ -338,10 +377,12 @@ npm test
 ## 📞 Getting Help
 
 ### Contacts
+
 - **Project Lead:** Ask for credentials and access
 - **Repository Issues:** [GitHub Issues](https://github.com/ashharzawarsyed/alertx/issues)
 
 ### Documentation
+
 - Backend API: See `apps/backend/README.md` (if exists)
 - Frontend: See individual app README files
 - Gmail Setup: `apps/backend/GMAIL_SETUP.md`
