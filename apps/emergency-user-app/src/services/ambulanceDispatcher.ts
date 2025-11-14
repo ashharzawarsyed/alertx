@@ -116,7 +116,7 @@ class AmbulanceDispatcher {
 
       // Call backend to find and dispatch nearest ambulance
       const response = await axios.post(
-        `${Config.API_URL}/api/emergency/dispatch-intelligent`,
+        `${Config.API_URL}/api/v1/emergencies/dispatch-intelligent`,
         {
           ambulanceType,
           severity: triageResult.severity,

@@ -134,9 +134,17 @@ export default function HomeScreen() {
 
       setDispatchedAmbulance(ambulance);
 
-      // Trigger emergency in backend
-      const response = await emergencyService.triggerEmergencyButton(
-        `AI-analyzed emergency: ${analysis.emergencyType} (${analysis.severity} severity)`
+      // Get actual symptoms from analysis
+      const actualSymptoms = analysis.detectedSymptoms?.map(s => s.keyword) || [];
+      const symptomsText = actualSymptoms.length > 0 
+        ? actualSymptoms.join(', ')
+        : `${analysis.emergencyType} emergency`;
+
+      // Trigger emergency in backend with actual symptoms
+      const response = await emergencyService.dispatchIntelligentAmbulance(
+        analysis,
+        userLocation,
+        { symptoms: symptomsText, description: `AI-analyzed: ${analysis.emergencyType} (${analysis.severity} severity)` }
       );
 
       if (response.success && response.data) {

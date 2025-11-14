@@ -755,6 +755,120 @@ export const dispatchIntelligentAmbulance = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Mark patient picked up
+ * @route   PUT /api/v1/emergencies/:id/pickup
+ * @access  Private (Driver)
+ */
+export const markPickedUp = asyncHandler(async (req, res) => {
+  if (req.user.role !== USER_ROLES.DRIVER) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.FORBIDDEN,
+      "Only drivers can update pickup status"
+    );
+  }
+
+  const emergency = await Emergency.findById(req.params.id);
+
+  if (!emergency) {
+    return sendResponse(res, RESPONSE_CODES.NOT_FOUND, "Emergency not found");
+  }
+
+  if (emergency.assignedDriver?.toString() !== req.user.id) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.FORBIDDEN,
+      "You are not assigned to this emergency"
+    );
+  }
+
+  if (emergency.status !== EMERGENCY_STATUS.ACCEPTED) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.BAD_REQUEST,
+      "Emergency must be in accepted status"
+    );
+  }
+
+  // Update emergency status
+  await emergency.updateStatus(EMERGENCY_STATUS.IN_PROGRESS, req.user.id);
+
+  // Update trip pickup time
+  if (emergency.trip) {
+    await Trip.findByIdAndUpdate(emergency.trip, {
+      pickupTime: new Date(),
+    });
+  }
+
+  await emergency.populate([
+    { path: "patient", select: "name phone" },
+    { path: "assignedHospital", select: "name address contactNumber location" },
+  ]);
+
+  sendResponse(res, RESPONSE_CODES.SUCCESS, "Patient picked up successfully", {
+    emergency,
+  });
+});
+
+/**
+ * @desc    Mark arrived at hospital
+ * @route   PUT /api/v1/emergencies/:id/hospital-arrival
+ * @access  Private (Driver)
+ */
+export const markArrivedAtHospital = asyncHandler(async (req, res) => {
+  if (req.user.role !== USER_ROLES.DRIVER) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.FORBIDDEN,
+      "Only drivers can update arrival status"
+    );
+  }
+
+  const emergency = await Emergency.findById(req.params.id);
+
+  if (!emergency) {
+    return sendResponse(res, RESPONSE_CODES.NOT_FOUND, "Emergency not found");
+  }
+
+  if (emergency.assignedDriver?.toString() !== req.user.id) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.FORBIDDEN,
+      "You are not assigned to this emergency"
+    );
+  }
+
+  if (emergency.status !== EMERGENCY_STATUS.IN_PROGRESS) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.BAD_REQUEST,
+      "Emergency must be in progress"
+    );
+  }
+
+  // Update trip hospital arrival time
+  if (emergency.trip) {
+    await Trip.findByIdAndUpdate(emergency.trip, {
+      hospitalArrivalTime: new Date(),
+    });
+  }
+
+  await emergency.populate([
+    { path: "patient", select: "name phone" },
+    { path: "assignedHospital", select: "name address contactNumber location" },
+  ]);
+
+  sendResponse(
+    res,
+    RESPONSE_CODES.SUCCESS,
+    "Hospital arrival marked successfully",
+    {
+      emergency,
+    }
+  );
+});
+
+/**
  * Helper function to determine ambulance type based on AI analysis
  */
 const determineAmbulanceType = (emergencyType, severity) => {

@@ -529,12 +529,17 @@ class EmergencyService {
     try {
       console.log('🚑 Dispatching intelligent ambulance...');
 
+      // Prepare symptoms array
+      const symptomsArray = additionalData?.symptoms 
+        ? additionalData.symptoms.split(', ') 
+        : triageResult.detectedSymptoms?.map((s: any) => s.keyword) || ['Unknown symptoms'];
+
       const response = await this.api.post<EmergencyResponse>(
         '/emergencies/dispatch-intelligent',
         {
           triageResult,
           location: userLocation,
-          symptoms: additionalData?.symptoms || triageResult.detectedSymptoms?.map((s: any) => s.keyword) || [],
+          symptoms: symptomsArray,
           description: additionalData?.description || `AI-analyzed: ${triageResult.emergencyType}`,
           severityLevel: triageResult.severity,
           nlpAnalysis: triageResult.nlpInsights,
