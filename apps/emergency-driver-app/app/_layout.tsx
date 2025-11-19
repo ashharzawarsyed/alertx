@@ -15,7 +15,7 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const { isAuthenticated, setAuth, clearAuth } = useAuthStore();
+  const { isAuthenticated, setAuth, clearAuth, setLoading } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
 
@@ -39,10 +39,13 @@ export default function RootLayout() {
 
   const checkAuth = async () => {
     try {
+      setLoading(true);
       const result = await authService.verifyToken();
 
       if (result.success && result.data) {
-        setAuth(result.data.user, result.data.token);
+        // Get the stored token since /auth/profile doesn't return it
+        const token = await authService.getStoredToken();
+        setAuth(result.data.user, token);
         
         // Connect to Socket.IO
         await socketService.connect();
@@ -52,6 +55,8 @@ export default function RootLayout() {
     } catch (error) {
       console.error('Auth check error:', error);
       clearAuth();
+    } finally {
+      setLoading(false);
     }
   };
 

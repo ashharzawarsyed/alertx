@@ -7,7 +7,20 @@ export interface LoginCredentials {
   password: string;
 }
 
-export interface AuthResponse {
+export interface RegisterData {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  role: 'driver';
+  driverInfo: {
+    licenseNumber: string;
+    ambulanceNumber: string;
+    status: 'available' | 'busy' | 'offline';
+  };
+}
+
+export interface LoginResponse {
   success: boolean;
   message: string;
   data?: {
@@ -17,10 +30,23 @@ export interface AuthResponse {
   errors?: string[];
 }
 
+export interface RegisterResponse {
+  success: boolean;
+  message: string;
+  data?: any;
+  errors?: string[];
+}
+
+// Alias for backward compatibility
+export type AuthResponse = LoginResponse;
+
 class AuthService {
   private api: AxiosInstance;
 
   constructor() {
+    console.log('🔧 AuthService initializing with API_URL:', Config.API_URL);
+    console.log('🔧 Socket URL:', Config.SOCKET_URL);
+    
     this.api = axios.create({
       baseURL: Config.API_URL,
       timeout: 15000,
@@ -62,11 +88,25 @@ class AuthService {
   }
 
   /**
+   * Get stored token
+   */
+  async getStoredToken(): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem('driver-auth-token');
+    } catch (error) {
+      console.error('Error getting stored token:', error);
+      return null;
+    }
+  }
+
+  /**
    * Login driver
    */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
       console.log('🔐 Logging in driver...');
+      console.log('🌐 API Base URL:', this.api.defaults.baseURL);
+      console.log('📧 Email:', credentials.email);
 
       const response = await this.api.post<AuthResponse>(
         '/auth/login',
@@ -137,10 +177,24 @@ class AuthService {
    */
   async verifyToken(): Promise<AuthResponse> {
     try {
-      const response = await this.api.get<AuthResponse>('/auth/me');
+      // Check if token exists first
+      const token = await AsyncStorage.getItem('driver-auth-token');
+      if (!token) {
+        console.log('ℹ️ No token found, skipping verification');
+        return {
+          success: false,
+          message: 'No token found',
+        };
+      }
+
+      console.log('🔍 Verifying token...');
+      const response = await this.api.get<AuthResponse>('/auth/profile');
+      console.log('✅ Token verified successfully');
       return response.data;
     } catch (error: any) {
-      console.error('❌ Token verification error:', error);
+      console.error('❌ Token verification error:', error.response?.status, error.message);
+      // Clear invalid token
+      await AsyncStorage.removeItem('driver-auth-token');
       return {
         success: false,
         message: 'Token verification failed',
@@ -149,14 +203,95 @@ class AuthService {
   }
 
   /**
-   * Update driver status
+   * Register new driver
    */
-  async updateStatus(status: 'available' | 'busy' | 'offline'): Promise<any> {
+  async register(data: RegisterData): Promise<RegisterResponse> {
     try {
-      const response = await this.api.put('/users/driver/status', { status });
+      console.log('📝 Registering new driver...');
+      console.log('📤 Registration data:', JSON.stringify(data, null, 2));
+
+      const response = await this.api.post<RegisterResponse>('/auth/register', data);
+
+      console.log('✅ Registration successful');
       return response.data;
     } catch (error: any) {
-      console.error('❌ Status update error:', error);
+      console.error('❌ Registration error:', error);
+      console.error('❌ Response status:', error.response?.status);
+      console.error('❌ Response data:', JSON.stringify(error.response?.data, null, 2));
+
+      if (error.response?.data) {
+        return error.response.data;
+      }
+
+      return {
+        success: false,
+        message: error.message || 'Registration failed',
+        errors: [error.message || 'Network error'],
+      };
+    }
+  }
+
+  /**
+   * Request password reset code
+   */
+  async requestPasswordReset(email: string): Promise<any> {
+    try {
+      console.log('📧 Requesting password reset for:', email);
+
+      const response = await this.api.post('/auth/forgot-password', { email });
+
+      console.log('✅ Reset code sent');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Password reset request error:', error);
+
+      if (error.response?.data) {
+        throw error.response.data;
+      }
+
+      throw new Error(error.message || 'Failed to send reset code');
+    }
+  }
+
+  /**
+   * Reset password with code
+   */
+  async resetPassword(
+    email: string,
+    code: string,
+    newPassword: string
+  ): Promise<any> {
+    try {
+      console.log('🔒 Resetting password...');
+
+      const response = await this.api.post('/auth/reset-password', {
+        email,
+        code,
+        newPassword,
+      });
+
+      console.log('✅ Password reset successful');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Password reset error:', error);
+
+      if (error.response?.data) {
+        throw error.response.data;
+      }
+
+      throw new Error(error.message || 'Failed to reset password');
+    }
+  }
+
+  /**
+   * Update driver status
+   */
+  async updateStatus(status: 'available' | 'busy' | 'offline') {
+    try {
+      const response = await this.api.put('/drivers/status', { status });
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Update status error:', error);
       throw error;
     }
   }
