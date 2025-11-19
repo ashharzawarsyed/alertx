@@ -24,7 +24,9 @@ connectDB();
 --------------------------------- */
 // CORS configuration
 const corsOptions = {
-  origin: process.env.FRONTEND_URLS?.split(",") || ["http://localhost:3000"],
+  origin: process.env.NODE_ENV === 'development' 
+    ? true // Allow all origins in development for React Native
+    : process.env.FRONTEND_URLS?.split(",") || ["http://localhost:3000"],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization"],

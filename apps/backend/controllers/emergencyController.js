@@ -5,6 +5,7 @@ import Trip from "../models/Trip.js";
 import { asyncHandler } from "../middlewares/errorHandler.js";
 import { sendResponse, calculateDistance } from "../utils/helpers.js";
 import aiTriageService from "../services/aiTriageService.js";
+import { emitToUser } from "../utils/socketHelper.js";
 import {
   RESPONSE_CODES,
   EMERGENCY_STATUS,
@@ -648,12 +649,16 @@ export const dispatchIntelligentAmbulance = asyncHandler(async (req, res) => {
     }
 
     // Create emergency with AI analysis
+    // Convert confidence from percentage (0-100) to decimal (0-1) and triageScore to 0-10 scale
+    const confidenceDecimal = (triageResult.confidence || 0) / 100;
+    const triageScoreValue = Math.min(Math.round(confidenceDecimal * 10), 10);
+    
     const emergency = await Emergency.create({
       patient: req.user.id,
       symptoms: symptoms || triageResult.detectedSymptoms?.map(s => s.keyword) || [],
       description: description || `AI-analyzed: ${triageResult.emergencyType}`,
       severityLevel: severityLevel || triageResult.severity,
-      triageScore: Math.round(triageResult.confidence || 0),
+      triageScore: triageScoreValue,
       location: {
         lat: location.lat,
         lng: location.lng,
@@ -662,7 +667,7 @@ export const dispatchIntelligentAmbulance = asyncHandler(async (req, res) => {
       status: EMERGENCY_STATUS.PENDING,
       requestTime: new Date(),
       aiPrediction: {
-        confidence: triageResult.confidence,
+        confidence: confidenceDecimal,
         emergencyType: triageResult.emergencyType,
         nlpInsights: nlpAnalysis,
         detectedSymptoms: triageResult.detectedSymptoms,
@@ -717,6 +722,21 @@ export const dispatchIntelligentAmbulance = asyncHandler(async (req, res) => {
       { path: "assignedDriver", select: "name email phone driverInfo" },
       { path: "assignedHospital", select: "name address phone location" },
     ]);
+
+    // Send real-time notification to driver via Socket.IO (after populate)
+    if (nearestDriver) {
+      try {
+        emitToUser(nearestDriver._id.toString(), "emergency:newRequest", {
+          emergency: emergency.toObject(), // Send full emergency object
+          message: `New ${triageResult.severity} emergency: ${triageResult.emergencyType}`,
+          timestamp: new Date().toISOString(),
+        });
+        console.log(`📲 Socket notification sent to driver: ${nearestDriver._id}`);
+      } catch (socketError) {
+        console.error("⚠️ Failed to send socket notification:", socketError.message);
+        // Don't fail the request if socket fails
+      }
+    }
 
     // Calculate ETA
     const eta = nearestDriver ? Math.floor(Math.random() * 15) + 5 : null;

@@ -9,11 +9,12 @@ let io;
 export const initializeSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: process.env.FRONTEND_URLS?.split(",") || [
-        "http://localhost:3000",
-      ],
+      origin: process.env.NODE_ENV === 'development' 
+        ? '*' // Allow all origins in development for React Native
+        : (process.env.FRONTEND_URLS?.split(",") || ["http://localhost:3000"]),
       credentials: true,
     },
+    transports: ['websocket', 'polling'], // Support both transports
   });
 
   // Authentication middleware

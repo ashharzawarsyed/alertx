@@ -84,6 +84,7 @@ class EmergencyService {
 
   constructor() {
     this.baseURL = Config.API_URL;
+    console.log('🔧 EmergencyService initialized with baseURL:', this.baseURL);
     this.api = axios.create({
       baseURL: this.baseURL,
       timeout: 25000,
@@ -528,6 +529,8 @@ class EmergencyService {
   ): Promise<EmergencyResponse> {
     try {
       console.log('🚑 Dispatching intelligent ambulance...');
+      console.log('📍 API baseURL:', this.baseURL);
+      console.log('📍 Full URL will be:', this.baseURL + '/emergencies/dispatch-intelligent');
 
       // Prepare symptoms array
       const symptomsArray = additionalData?.symptoms 

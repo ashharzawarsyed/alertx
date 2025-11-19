@@ -1,4 +1,5 @@
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Config from '../config/config';
 import { TriageResult, EmergencyType } from './symptomAnalyzer';
 
@@ -114,9 +115,18 @@ class AmbulanceDispatcher {
 
       console.log('📋 Selected ambulance type:', ambulanceType);
 
+      // Get auth token
+      const token = await AsyncStorage.getItem('auth-token');
+      const headers: any = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
       // Call backend to find and dispatch nearest ambulance
       const response = await axios.post(
-        `${Config.API_URL}/api/v1/emergencies/dispatch-intelligent`,
+        `${Config.API_URL}/emergencies/dispatch-intelligent`,
         {
           ambulanceType,
           severity: triageResult.severity,
@@ -125,6 +135,7 @@ class AmbulanceDispatcher {
           triageAnalysis: triageResult,
         },
         {
+          headers,
           timeout: 10000, // 10 second timeout
         }
       );
