@@ -157,15 +157,35 @@ export default function EmergencyTrackingScreen() {
             [patientLng, patientLat]
           );
         }
+      } else {
+        // Fallback: show error but don't crash
+        console.warn('Failed to fetch emergency details:', response.message);
+        if (showLoader) {
+          Alert.alert(
+            "Limited Access",
+            "Unable to load full emergency details. Some features may be unavailable.",
+            [{ text: "OK" }]
+          );
+        }
       }
     } catch (error: any) {
       console.error("Error fetching emergency:", error);
-      Alert.alert("Error", "Failed to load emergency details");
+      // Don't show alert on background refresh
+      if (showLoader) {
+        Alert.alert(
+          "Connection Error",
+          "Unable to load emergency details. Please check your connection and try again.",
+          [
+            { text: "Retry", onPress: () => fetchEmergencyDetails(true) },
+            { text: "Go Back", onPress: () => router.back(), style: "cancel" },
+          ]
+        );
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [emergencyId, calculateETA]);
+  }, [emergencyId, calculateETA, router]);
 
   useEffect(() => {
     fetchEmergencyDetails();

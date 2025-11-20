@@ -8,6 +8,7 @@ import {
   logout,
   forgotPassword,
   resetPassword,
+  requestPasswordReset,
   getPendingAdmins,
   approveAdmin,
   registerHospital,

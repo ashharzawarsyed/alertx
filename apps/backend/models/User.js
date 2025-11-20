@@ -366,6 +366,16 @@ const userSchema = new mongoose.Schema(
     passwordResetToken: String,
     passwordResetExpires: Date,
 
+    // Password reset with 6-digit code
+    resetPasswordCode: {
+      type: String,
+      select: false,
+    },
+    resetPasswordExpiry: {
+      type: Date,
+      select: false,
+    },
+
     // Email verification with OTP
     emailVerified: {
       type: Boolean,
@@ -408,6 +418,8 @@ userSchema.methods.toJSON = function () {
   delete user.verificationToken;
   delete user.passwordResetToken;
   delete user.passwordResetExpires;
+  delete user.resetPasswordCode;
+  delete user.resetPasswordExpiry;
   delete user.emailVerificationOTP;
   delete user.emailVerificationOTPExpires;
   return user;

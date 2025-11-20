@@ -83,17 +83,39 @@ export default function EmergenciesScreen() {
   };
 
   const handleEmergencyPress = (emergency: Emergency) => {
-    // Navigate to tracking screen for active emergencies
-    if (["pending", "accepted", "in_progress"].includes(emergency.status)) {
-      router.push({
-        pathname: "/emergency/tracking" as any,
-        params: { emergencyId: emergency._id },
-      });
-    } else {
-      // Show details alert for completed/cancelled emergencies
+    try {
+      // Navigate to tracking screen for active emergencies
+      if (["pending", "accepted", "in_progress"].includes(emergency.status)) {
+        router.push({
+          pathname: "/emergency/tracking" as any,
+          params: { emergencyId: emergency._id },
+        });
+      } else {
+        // Show details alert for completed/cancelled emergencies
+        const aiPrediction = (emergency as any).aiPrediction;
+        const detailsText = [
+          `ID: ${emergency._id}`,
+          ``,
+          `Status: ${emergency.status.replace("_", " ").toUpperCase()}`,
+          `Severity: ${emergency.severityLevel.toUpperCase()}`,
+          `Triage Score: ${emergency.triageScore}/10`,
+          ``,
+          `Symptoms:`,
+          ...emergency.symptoms.map((s) => `• ${s}`),
+          ``,
+          aiPrediction?.emergencyType ? `Emergency Type: ${aiPrediction.emergencyType}` : null,
+          aiPrediction?.confidence ? `AI Confidence: ${Math.round(aiPrediction.confidence)}%` : null,
+          ``,
+          `Location: ${emergency.location.address || "Address not available"}`,
+        ].filter(Boolean).join("\n");
+
+        Alert.alert("Emergency Details", detailsText, [{ text: "OK" }]);
+      }
+    } catch (error) {
+      console.error('Error handling emergency press:', error);
       Alert.alert(
         "Emergency Details",
-        `ID: ${emergency._id}\n\nStatus: ${emergency.status.replace("_", " ").toUpperCase()}\nSeverity: ${emergency.severityLevel.toUpperCase()}\nTriage Score: ${emergency.triageScore}/10\n\nSymptoms:\n${emergency.symptoms.map((s) => `• ${s}`).join("\n")}\n\nLocation: ${emergency.location.address || "Address not available"}`,
+        `Unable to load full details\n\nID: ${emergency._id}\nStatus: ${emergency.status}\nSeverity: ${emergency.severityLevel}`,
         [{ text: "OK" }]
       );
     }

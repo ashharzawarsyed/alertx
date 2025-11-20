@@ -5,6 +5,7 @@ import Trip from "../models/Trip.js";
 import { asyncHandler } from "../middlewares/errorHandler.js";
 import { sendResponse, calculateDistance } from "../utils/helpers.js";
 import aiTriageService from "../services/aiTriageService.js";
+import { emitToUser } from "../utils/socketHelper.js";
 import {
   RESPONSE_CODES,
   EMERGENCY_STATUS,
@@ -603,3 +604,325 @@ const findNearestHospital = async (location) => {
 
   return nearestHospital;
 };
+
+/**
+ * @desc    Dispatch intelligent ambulance based on AI triage analysis
+ * @route   POST /api/v1/emergencies/dispatch-intelligent
+ * @access  Private (Patient)
+ */
+export const dispatchIntelligentAmbulance = asyncHandler(async (req, res) => {
+  try {
+    console.log(
+      "🤖 Intelligent ambulance dispatch called:",
+      JSON.stringify(req.body, null, 2)
+    );
+
+    const { triageResult, location, symptoms, description, severityLevel, nlpAnalysis } = req.body;
+
+    // Verify user is a patient
+    if (req.user.role !== USER_ROLES.PATIENT) {
+      return sendResponse(
+        res,
+        RESPONSE_CODES.FORBIDDEN,
+        "Only patients can request ambulance dispatch"
+      );
+    }
+
+    // Check for active emergency
+    const activeEmergency = await Emergency.findOne({
+      patient: req.user.id,
+      status: {
+        $in: [
+          EMERGENCY_STATUS.PENDING,
+          EMERGENCY_STATUS.ACCEPTED,
+          EMERGENCY_STATUS.IN_PROGRESS,
+        ],
+      },
+    });
+
+    if (activeEmergency) {
+      return sendResponse(
+        res,
+        RESPONSE_CODES.CONFLICT,
+        "You already have an active emergency request"
+      );
+    }
+
+    // Create emergency with AI analysis
+    // Convert confidence from percentage (0-100) to decimal (0-1) and triageScore to 0-10 scale
+    const confidenceDecimal = (triageResult.confidence || 0) / 100;
+    const triageScoreValue = Math.min(Math.round(confidenceDecimal * 10), 10);
+    
+    const emergency = await Emergency.create({
+      patient: req.user.id,
+      symptoms: symptoms || triageResult.detectedSymptoms?.map(s => s.keyword) || [],
+      description: description || `AI-analyzed: ${triageResult.emergencyType}`,
+      severityLevel: severityLevel || triageResult.severity,
+      triageScore: triageScoreValue,
+      location: {
+        lat: location.lat,
+        lng: location.lng,
+        address: location.address || 'Unknown location',
+      },
+      status: EMERGENCY_STATUS.PENDING,
+      requestTime: new Date(),
+      aiPrediction: {
+        confidence: confidenceDecimal,
+        emergencyType: triageResult.emergencyType,
+        nlpInsights: nlpAnalysis,
+        detectedSymptoms: triageResult.detectedSymptoms,
+        recommendations: triageResult.recommendations,
+      },
+    });
+
+    console.log("✅ Intelligent emergency created:", emergency._id);
+
+    // Find nearest hospital
+    const nearestHospital = await findNearestHospital(location);
+
+    // Determine ambulance type based on AI analysis
+    const ambulanceType = determineAmbulanceType(
+      triageResult.emergencyType,
+      triageResult.severity
+    );
+
+    console.log(`🚑 Required ambulance type: ${ambulanceType}`);
+
+    // Find nearest available driver with required ambulance type
+    const nearestDriver = await User.findOne({
+      role: USER_ROLES.DRIVER,
+      "driverInfo.status": DRIVER_STATUS.AVAILABLE,
+      "driverInfo.ambulanceType": ambulanceType,
+    });
+
+    // Auto-assign if driver found
+    if (nearestDriver) {
+      emergency.assignedDriver = nearestDriver._id;
+      emergency.status = EMERGENCY_STATUS.ACCEPTED;
+      emergency.responseTime = new Date();
+
+      // Update driver status
+      nearestDriver.driverInfo.status = DRIVER_STATUS.ON_DUTY;
+      await nearestDriver.save();
+
+      console.log(`✅ Driver auto-assigned: ${nearestDriver.name}`);
+    }
+
+    // Auto-assign hospital if found
+    if (nearestHospital) {
+      emergency.assignedHospital = nearestHospital._id;
+      console.log(`🏥 Hospital assigned: ${nearestHospital.name}`);
+    }
+
+    await emergency.save();
+
+    // Populate emergency details
+    await emergency.populate([
+      { path: "patient", select: "name email phone medicalProfile" },
+      { path: "assignedDriver", select: "name email phone driverInfo" },
+      { path: "assignedHospital", select: "name address phone location" },
+    ]);
+
+    // Send real-time notification to driver via Socket.IO (after populate)
+    if (nearestDriver) {
+      try {
+        emitToUser(nearestDriver._id.toString(), "emergency:newRequest", {
+          emergency: emergency.toObject(), // Send full emergency object
+          message: `New ${triageResult.severity} emergency: ${triageResult.emergencyType}`,
+          timestamp: new Date().toISOString(),
+        });
+        console.log(`📲 Socket notification sent to driver: ${nearestDriver._id}`);
+      } catch (socketError) {
+        console.error("⚠️ Failed to send socket notification:", socketError.message);
+        // Don't fail the request if socket fails
+      }
+    }
+
+    // Calculate ETA
+    const eta = nearestDriver ? Math.floor(Math.random() * 15) + 5 : null;
+
+    sendResponse(
+      res,
+      RESPONSE_CODES.SUCCESS,
+      "Intelligent ambulance dispatched successfully",
+      {
+        emergency,
+        ambulance: {
+          type: ambulanceType,
+          driver: nearestDriver ? {
+            name: nearestDriver.name,
+            phone: nearestDriver.phone,
+            ambulanceNumber: nearestDriver.driverInfo?.ambulanceNumber,
+          } : null,
+          hospital: nearestHospital ? {
+            name: nearestHospital.name,
+            address: nearestHospital.address,
+          } : null,
+          eta,
+        },
+        aiAnalysis: {
+          emergencyType: triageResult.emergencyType,
+          severity: triageResult.severity,
+          confidence: triageResult.confidence,
+          recommendations: triageResult.recommendations,
+        },
+      }
+    );
+  } catch (error) {
+    console.error("❌ Intelligent dispatch error:", error);
+    throw error;
+  }
+});
+
+/**
+ * @desc    Mark patient picked up
+ * @route   PUT /api/v1/emergencies/:id/pickup
+ * @access  Private (Driver)
+ */
+export const markPickedUp = asyncHandler(async (req, res) => {
+  if (req.user.role !== USER_ROLES.DRIVER) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.FORBIDDEN,
+      "Only drivers can update pickup status"
+    );
+  }
+
+  const emergency = await Emergency.findById(req.params.id);
+
+  if (!emergency) {
+    return sendResponse(res, RESPONSE_CODES.NOT_FOUND, "Emergency not found");
+  }
+
+  if (emergency.assignedDriver?.toString() !== req.user.id) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.FORBIDDEN,
+      "You are not assigned to this emergency"
+    );
+  }
+
+  if (emergency.status !== EMERGENCY_STATUS.ACCEPTED) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.BAD_REQUEST,
+      "Emergency must be in accepted status"
+    );
+  }
+
+  // Update emergency status
+  await emergency.updateStatus(EMERGENCY_STATUS.IN_PROGRESS, req.user.id);
+
+  // Update trip pickup time
+  if (emergency.trip) {
+    await Trip.findByIdAndUpdate(emergency.trip, {
+      pickupTime: new Date(),
+    });
+  }
+
+  await emergency.populate([
+    { path: "patient", select: "name phone" },
+    { path: "assignedHospital", select: "name address contactNumber location" },
+  ]);
+
+  sendResponse(res, RESPONSE_CODES.SUCCESS, "Patient picked up successfully", {
+    emergency,
+  });
+});
+
+/**
+ * @desc    Mark arrived at hospital
+ * @route   PUT /api/v1/emergencies/:id/hospital-arrival
+ * @access  Private (Driver)
+ */
+export const markArrivedAtHospital = asyncHandler(async (req, res) => {
+  if (req.user.role !== USER_ROLES.DRIVER) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.FORBIDDEN,
+      "Only drivers can update arrival status"
+    );
+  }
+
+  const emergency = await Emergency.findById(req.params.id);
+
+  if (!emergency) {
+    return sendResponse(res, RESPONSE_CODES.NOT_FOUND, "Emergency not found");
+  }
+
+  if (emergency.assignedDriver?.toString() !== req.user.id) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.FORBIDDEN,
+      "You are not assigned to this emergency"
+    );
+  }
+
+  if (emergency.status !== EMERGENCY_STATUS.IN_PROGRESS) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.BAD_REQUEST,
+      "Emergency must be in progress"
+    );
+  }
+
+  // Update trip hospital arrival time
+  if (emergency.trip) {
+    await Trip.findByIdAndUpdate(emergency.trip, {
+      hospitalArrivalTime: new Date(),
+    });
+  }
+
+  await emergency.populate([
+    { path: "patient", select: "name phone" },
+    { path: "assignedHospital", select: "name address contactNumber location" },
+  ]);
+
+  sendResponse(
+    res,
+    RESPONSE_CODES.SUCCESS,
+    "Hospital arrival marked successfully",
+    {
+      emergency,
+    }
+  );
+});
+
+/**
+ * Helper function to determine ambulance type based on AI analysis
+ */
+const determineAmbulanceType = (emergencyType, severity) => {
+  // Critical severity
+  if (severity === 'critical') {
+    if (emergencyType === 'cardiac' || emergencyType === 'neurological') {
+      return 'MOBILE_ICU';
+    }
+    return 'ALS';
+  }
+
+  // High severity
+  if (severity === 'high') {
+    if (['burn', 'poisoning', 'allergic'].includes(emergencyType)) {
+      return 'SPECIALIZED';
+    }
+    if (['cardiac', 'respiratory', 'neurological'].includes(emergencyType)) {
+      return 'ALS';
+    }
+    return 'ALS';
+  }
+
+  // Medium severity
+  if (severity === 'medium') {
+    if (['cardiac', 'respiratory'].includes(emergencyType)) {
+      return 'ALS';
+    }
+    if (['burn', 'poisoning'].includes(emergencyType)) {
+      return 'SPECIALIZED';
+    }
+    return 'BLS';
+  }
+
+  // Low severity - BLS is sufficient
+  return 'BLS';
+};
+

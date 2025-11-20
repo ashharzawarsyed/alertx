@@ -16,6 +16,7 @@ import {
   sendHospitalRegistrationConfirmation,
   sendHospitalApprovalRequest,
   sendRegistrationOTP,
+  sendPasswordResetEmail,
 } from "../services/emailService.js";
 
 export const register = asyncHandler(async (req, res) => {
@@ -324,58 +325,42 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   const user = await User.findOne({ email });
 
   if (!user) {
-    return sendResponse(res, RESPONSE_CODES.NOT_FOUND, "User not found");
+    // Don't reveal if email exists for security
+    return sendResponse(
+      res,
+      RESPONSE_CODES.SUCCESS,
+      "If your email is registered, you will receive a password reset code"
+    );
   }
 
-  // Generate reset token (in production, send via email)
+  // Generate 6-digit reset code
   const resetToken = generateOTP(6);
   user.passwordResetToken = resetToken;
-  user.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  user.passwordResetExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
 
   await user.save();
 
-  // TODO: Send reset token via email
-  console.log(`Password reset token for ${email}: ${resetToken}`);
+  // Send reset code via email
+  console.log(`🔐 Password reset token for ${email}: ${resetToken}`);
+  
+  try {
+    await sendPasswordResetEmail(email, resetToken, user.name);
+    console.log(`✅ Password reset email sent successfully to ${email}`);
+  } catch (emailError) {
+    console.error(`❌ Failed to send password reset email:`, emailError);
+    // Don't fail the request if email fails - user can still see code in logs for development
+  }
 
   sendResponse(
     res,
     RESPONSE_CODES.SUCCESS,
-    "Password reset token sent to email"
+    "Password reset code has been sent to your email"
   );
 });
 
 /**
  * @desc    Reset password
  * @route   POST /api/v1/auth/reset-password
- * @access  Public
- */
-export const resetPassword = asyncHandler(async (req, res) => {
-  const { email, token, newPassword } = req.body;
-
-  const user = await User.findOne({
-    email,
-    passwordResetToken: token,
-    passwordResetExpires: { $gt: Date.now() },
-  });
-
-  if (!user) {
-    return sendResponse(
-      res,
-      RESPONSE_CODES.BAD_REQUEST,
-      "Invalid or expired reset token"
-    );
-  }
-
-  // Update password and clear reset token
-  user.password = newPassword;
-  user.passwordResetToken = undefined;
-  user.passwordResetExpires = undefined;
-
-  await user.save();
-
-  sendResponse(res, RESPONSE_CODES.SUCCESS, "Password reset successful");
-});
-
 /**
  * @desc    Get pending admin approvals (Admin only)
  * @route   GET /api/v1/auth/admin/pending
@@ -873,4 +858,130 @@ export const verifyOTPAndRegister = asyncHandler(async (req, res) => {
       "Registration failed. Please try again."
     );
   }
+});
+
+/**
+ * @desc    Request password reset
+ * @route   POST /api/v1/auth/forgot-password
+ * @access  Public
+ */
+export const requestPasswordReset = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.BAD_REQUEST,
+      "Email is required"
+    );
+  }
+
+  // Find user
+  const user = await User.findOne({ email: email.toLowerCase() });
+
+  if (!user) {
+    // Don't reveal if email exists for security
+    return sendResponse(
+      res,
+      RESPONSE_CODES.SUCCESS,
+      "If your email is registered, you will receive a password reset code"
+    );
+  }
+
+  // Generate 6-digit code
+  const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const resetCodeExpiry = Date.now() + 15 * 60 * 1000; // 15 minutes
+
+  // Save reset code
+  user.resetPasswordCode = resetCode;
+  user.resetPasswordExpiry = resetCodeExpiry;
+  await user.save();
+
+  // Log code for development
+  console.log(`🔐 Password reset code for ${email}: ${resetCode}`);
+
+  // Send email with code
+  try {
+    await sendPasswordResetEmail(email, resetCode, user.name);
+    console.log(`✅ Password reset email sent successfully to ${email}`);
+  } catch (emailError) {
+    console.error(`❌ Failed to send password reset email:`, emailError);
+    // Don't fail the request if email fails - user can still see code in logs for development
+  }
+
+  sendResponse(
+    res,
+    RESPONSE_CODES.SUCCESS,
+    "Password reset code has been sent to your email"
+  );
+});
+
+/**
+ * @desc    Reset password with code
+ * @route   POST /api/v1/auth/reset-password
+ * @access  Public
+ */
+export const resetPassword = asyncHandler(async (req, res) => {
+  const { email, code, newPassword } = req.body;
+
+  if (!email || !code || !newPassword) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.BAD_REQUEST,
+      "Email, code, and new password are required"
+    );
+  }
+
+  // Validate password strength
+  if (newPassword.length < 8) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.BAD_REQUEST,
+      "Password must be at least 8 characters"
+    );
+  }
+
+  // Find user
+  const user = await User.findOne({ email: email.toLowerCase() })
+    .select('+resetPasswordCode +resetPasswordExpiry');
+
+  if (!user) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.NOT_FOUND,
+      "User not found"
+    );
+  }
+
+  // Verify reset code
+  if (user.resetPasswordCode !== code) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.BAD_REQUEST,
+      "Invalid reset code"
+    );
+  }
+
+  // Check if code expired
+  if (Date.now() > user.resetPasswordExpiry) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.BAD_REQUEST,
+      "Reset code has expired. Please request a new one."
+    );
+  }
+
+  // Update password
+  user.password = newPassword; // Will be hashed by pre-save hook
+  user.resetPasswordCode = undefined;
+  user.resetPasswordExpiry = undefined;
+  await user.save();
+
+  console.log(`✅ Password reset successful for ${email}`);
+
+  sendResponse(
+    res,
+    RESPONSE_CODES.SUCCESS,
+    "Password reset successful"
+  );
 });

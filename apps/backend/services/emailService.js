@@ -602,6 +602,71 @@ export const sendRegistrationOTP = async (userData) => {
   }
 };
 
+/**
+ * Send password reset code email
+ */
+export const sendPasswordResetEmail = async (email, resetCode, userName = '') => {
+  try {
+    const transporter = createTransporter();
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || "noreply@alertx.com",
+      to: email,
+      subject: "🔐 Password Reset Code - AlertX",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #EF4444, #DC2626); padding: 30px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">🚨 AlertX</h1>
+            <p style="color: white; margin: 10px 0 0 0; opacity: 0.9;">Password Reset Request</p>
+          </div>
+          
+          <div style="padding: 30px; background: #f8fafc;">
+            ${userName ? `<h2 style="color: #1e293b; margin-bottom: 20px;">Hello ${userName},</h2>` : ''}
+            
+            <p style="color: #475569; line-height: 1.6; margin-bottom: 20px;">
+              We received a request to reset your password. Use the code below to reset your password:
+            </p>
+            
+            <div style="background: white; border-radius: 12px; padding: 30px; margin: 30px 0; text-align: center; border: 2px solid #EF4444;">
+              <p style="color: #64748b; margin: 0 0 10px 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Your Reset Code</p>
+              <div style="font-size: 42px; font-weight: bold; color: #EF4444; letter-spacing: 8px; font-family: 'Courier New', monospace;">
+                ${resetCode}
+              </div>
+              <p style="color: #64748b; margin: 15px 0 0 0; font-size: 13px;">
+                ⏰ This code will expire in <strong>15 minutes</strong>
+              </p>
+            </div>
+            
+            <div style="background: #fee2e2; border-radius: 8px; padding: 15px; margin: 20px 0; border-left: 4px solid #EF4444;">
+              <p style="margin: 0; color: #991b1b; font-weight: 500;">
+                🔒 Security Notice
+              </p>
+              <p style="margin: 10px 0 0 0; color: #991b1b; font-size: 14px;">
+                If you didn't request this password reset, please ignore this email or contact support if you're concerned about your account security.
+              </p>
+            </div>
+            
+            <p style="color: #64748b; font-size: 14px; line-height: 1.6; margin-top: 30px;">
+              <strong>Need Help?</strong><br>
+              If you're having trouble resetting your password, please contact our support team.
+            </p>
+          </div>
+          
+          <div style="background: #e2e8f0; padding: 20px; text-align: center; color: #64748b; font-size: 12px;">
+            <p style="margin: 0;">AlertX Emergency Response System</p>
+            <p style="margin: 5px 0 0 0;">This is an automated message. Please do not reply to this email.</p>
+          </div>
+        </div>
+      `,
+    };
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Password reset email sent to: ${email}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Failed to send password reset email to ${email}:`, error);
+    return false;
+  }
+};
+
 export default {
   sendAdminApprovalRequest,
   sendAdminApprovalConfirmation,
@@ -610,4 +675,5 @@ export default {
   sendHospitalApprovalRequest,
   sendHospitalApprovalConfirmation,
   sendRegistrationOTP,
+  sendPasswordResetEmail,
 };

@@ -1033,8 +1033,14 @@ export default function SignUpScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
-        <View style={styles.contentWrapper}>
+        <ScrollView
+          contentContainerStyle={styles.scrollViewContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.contentWrapper}>
           {/* Step Indicator */}
           <SafeAreaView edges={["bottom"]} style={styles.formSafeArea}>
             <Animated.View
@@ -1072,7 +1078,8 @@ export default function SignUpScreen() {
               </View>
             </Animated.View>
           </SafeAreaView>
-        </View>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
@@ -1085,6 +1092,9 @@ const styles = StyleSheet.create({
   },
   keyboardView: {
     flex: 1,
+  },
+  scrollViewContent: {
+    flexGrow: 1,
   },
   contentWrapper: {
     flex: 1,

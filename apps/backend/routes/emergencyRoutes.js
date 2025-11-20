@@ -7,6 +7,9 @@ import {
   acceptEmergency,
   updateEmergencyStatus,
   addNote,
+  dispatchIntelligentAmbulance,
+  markPickedUp,
+  markArrivedAtHospital,
 } from "../controllers/emergencyController.js";
 import {
   validateEmergencyRequest,
@@ -40,6 +43,18 @@ router.post(
   authenticate,
   authorize(USER_ROLES.PATIENT),
   emergencyButton
+);
+
+/**
+ * @route   POST /api/v1/emergencies/dispatch-intelligent
+ * @desc    Dispatch intelligent ambulance based on AI triage analysis
+ * @access  Private (Patients only)
+ */
+router.post(
+  "/dispatch-intelligent",
+  authenticate,
+  authorize(USER_ROLES.PATIENT),
+  dispatchIntelligentAmbulance
 );
 
 /**
@@ -80,6 +95,32 @@ router.post(
   authorize(USER_ROLES.DRIVER),
   validateObjectId("id"),
   acceptEmergency
+);
+
+/**
+ * @route   PUT /api/v1/emergencies/:id/pickup
+ * @desc    Mark patient picked up
+ * @access  Private (Drivers only)
+ */
+router.put(
+  "/:id/pickup",
+  authenticate,
+  authorize(USER_ROLES.DRIVER),
+  validateObjectId("id"),
+  markPickedUp
+);
+
+/**
+ * @route   PUT /api/v1/emergencies/:id/hospital-arrival
+ * @desc    Mark arrived at hospital
+ * @access  Private (Drivers only)
+ */
+router.put(
+  "/:id/hospital-arrival",
+  authenticate,
+  authorize(USER_ROLES.DRIVER),
+  validateObjectId("id"),
+  markArrivedAtHospital
 );
 
 /**
