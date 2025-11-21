@@ -16,6 +16,7 @@ import { useEmergencyStore } from '@/src/store/emergencyStore';
 import emergencyService, { Emergency } from '@/src/services/emergencyService';
 import socketService from '@/src/services/socketService';
 import locationService from '@/src/services/locationService';
+import authService from '@/src/services/authService';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -126,9 +127,21 @@ export default function HomeScreen() {
   const toggleAvailability = async (value: boolean) => {
     try {
       const newStatus = value ? 'available' : 'offline';
+      
+      // Update status in backend database (persists across restarts)
+      const response = await authService.updateDriverStatus(newStatus);
+      
+      // Update local state
       setIsAvailable(value);
       updateDriverStatus(newStatus);
+      
+      // Update socket status
       socketService.updateStatus(newStatus);
+
+      // Update store with the user data from backend
+      if (response?.data?.user) {
+        updateDriverStatus(response.data.user.driverInfo.status);
+      }
 
       if (value) {
         // Start tracking location when available
@@ -136,10 +149,27 @@ export default function HomeScreen() {
         if (location) {
           socketService.updateLocation(location);
         }
+        
+        Alert.alert(
+          '✅ Now Available',
+          'You are now available for emergencies. You will receive notifications when there are new emergency requests.'
+        );
+      } else {
+        Alert.alert(
+          '🚫 Now Offline',
+          'You are now offline and will not receive emergency requests'
+        );
       }
-    } catch (error) {
-      console.error('Status update error:', error);
+    } catch (error: any) {
+      console.error('❌ Status update error:', error);
+      
+      // Revert UI state on error
       setIsAvailable(!value);
+      
+      Alert.alert(
+        '❌ Update Failed',
+        error.response?.data?.message || 'Failed to update status. Please check your connection and try again.'
+      );
     }
   };
 

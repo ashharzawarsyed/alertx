@@ -391,6 +391,27 @@ class AuthService {
       throw error;
     }
   }
+
+  /**
+   * Update driver status (new endpoint with database persistence)
+   */
+  async updateDriverStatus(status: 'available' | 'busy' | 'offline'): Promise<any> {
+    try {
+      console.log(`🔄 Updating driver status to: ${status}`);
+      
+      const response = await this.api.put('/users/driver/status', { status });
+      
+      if (response.data.success) {
+        console.log('✅ Driver status updated in database');
+        return response.data;
+      } else {
+        throw new Error(response.data.message || 'Failed to update status');
+      }
+    } catch (error: any) {
+      console.error('❌ Update driver status error:', error.response?.data || error.message);
+      throw error;
+    }
+  }
 }
 
 export const authService = new AuthService();

@@ -286,3 +286,52 @@ export const getUserStats = asyncHandler(async (req, res) => {
     }
   );
 });
+
+/**
+ * @desc    Update driver status (available/busy/offline)
+ * @route   PUT /api/v1/users/driver/status
+ * @access  Private (Driver only)
+ */
+export const updateDriverStatus = asyncHandler(async (req, res) => {
+  const { status } = req.body;
+  const userId = req.user.id;
+
+  // Validate user is a driver
+  if (req.user.role !== USER_ROLES.DRIVER) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.FORBIDDEN,
+      "Only drivers can update driver status"
+    );
+  }
+
+  // Validate status value
+  const validStatuses = Object.values(DRIVER_STATUS);
+  if (!status || !validStatuses.includes(status)) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.BAD_REQUEST,
+      `Invalid status. Must be one of: ${validStatuses.join(", ")}`
+    );
+  }
+
+  // Update driver status in database
+  const updatedUser = await User.findByIdAndUpdate(
+    userId,
+    { "driverInfo.status": status },
+    { new: true, runValidators: true }
+  ).select("-password");
+
+  if (!updatedUser) {
+    return sendResponse(res, RESPONSE_CODES.NOT_FOUND, "Driver not found");
+  }
+
+  console.log(`✅ Driver status updated in database: ${updatedUser.name} (${updatedUser._id}) -> ${status}`);
+
+  sendResponse(
+    res,
+    RESPONSE_CODES.SUCCESS,
+    "Driver status updated successfully",
+    { user: updatedUser }
+  );
+});

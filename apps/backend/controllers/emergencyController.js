@@ -507,8 +507,32 @@ export const acceptEmergency = asyncHandler(async (req, res) => {
 
   await emergency.populate([
     { path: "patient", select: "name phone" },
+    { path: "assignedDriver", select: "name phone driverInfo" },
     { path: "assignedHospital", select: "name address contactNumber location" },
   ]);
+
+  // Notify patient via socket that driver accepted emergency
+  const { emitToUser } = await import("../utils/socketHelper.js");
+  emitToUser(emergency.patient._id.toString(), "emergency:accepted", {
+    emergencyId: emergency._id,
+    driver: {
+      id: driver._id,
+      name: driver.name,
+      phone: driver.phone,
+      ambulanceNumber: driver.driverInfo.ambulanceNumber,
+      licenseNumber: driver.driverInfo.licenseNumber,
+    },
+    hospital: {
+      id: nearestHospital._id,
+      name: nearestHospital.name,
+      address: nearestHospital.address,
+    },
+    status: EMERGENCY_STATUS.ACCEPTED,
+    timestamp: new Date(),
+  });
+
+  console.log(`✅ Emergency ${emergency._id} accepted by driver ${driver.name}`);
+  console.log(`📡 Socket notification sent to patient ${emergency.patient._id}`);
 
   sendResponse(res, RESPONSE_CODES.SUCCESS, "Emergency accepted successfully", {
     emergency,
@@ -726,43 +750,66 @@ export const dispatchIntelligentAmbulance = asyncHandler(async (req, res) => {
 
     console.log(`🚑 Required ambulance type: ${ambulanceType}`);
 
-    // Find nearest available driver with required ambulance type
+    // Find nearest available driver - try with ambulance type first, then without
     console.log('🔍 Searching for available drivers with criteria:', {
       role: USER_ROLES.DRIVER,
       "driverInfo.status": DRIVER_STATUS.AVAILABLE,
       "driverInfo.ambulanceType": ambulanceType,
     });
 
-    const nearestDriver = await User.findOne({
+    let nearestDriver = await User.findOne({
       role: USER_ROLES.DRIVER,
       "driverInfo.status": DRIVER_STATUS.AVAILABLE,
       "driverInfo.ambulanceType": ambulanceType,
     });
 
+    // If no driver found with specific ambulance type, search for any available driver
+    if (!nearestDriver) {
+      console.log('🔍 No driver with specific ambulance type, searching for ANY available driver...');
+      nearestDriver = await User.findOne({
+        role: USER_ROLES.DRIVER,
+        "driverInfo.status": DRIVER_STATUS.AVAILABLE,
+      });
+    }
+
     console.log('🔍 Driver search result:', nearestDriver ? {
       id: nearestDriver._id,
       name: nearestDriver.name,
       status: nearestDriver.driverInfo?.status,
-      ambulanceType: nearestDriver.driverInfo?.ambulanceType
+      ambulanceType: nearestDriver.driverInfo?.ambulanceType || 'NOT SET',
+      phone: nearestDriver.phone,
+      ambulanceNumber: nearestDriver.driverInfo?.ambulanceNumber || 'NOT SET'
     } : 'NO DRIVER FOUND');
 
-    // Auto-assign if driver found
+    // DO NOT auto-assign driver - wait for driver to accept manually
+    // Just notify the driver via socket
     if (nearestDriver) {
-      emergency.assignedDriver = nearestDriver._id;
-      emergency.status = EMERGENCY_STATUS.ACCEPTED;
-      emergency.responseTime = new Date();
-
-      // Update driver status
-      nearestDriver.driverInfo.status = DRIVER_STATUS.ON_DUTY;
-      await nearestDriver.save();
-
-      console.log(`✅ Driver auto-assigned: ${nearestDriver.name}`);
+      console.log(`📡 Notifying driver ${nearestDriver.name} about emergency`);
+      
+      // Import socket helper to send notification
+      const { emitToUser } = await import("../utils/socketHelper.js");
+      emitToUser(nearestDriver._id.toString(), "emergency:newRequest", {
+        emergency: {
+          _id: emergency._id,
+          location: emergency.location,
+          severityLevel: emergency.severityLevel,
+          symptoms: emergency.symptoms,
+          description: emergency.description,
+          patient: {
+            name: req.user.name,
+            phone: req.user.phone,
+          },
+          aiAnalysis: triageResult,
+          timestamp: new Date(),
+        },
+      });
+      
+      console.log(`✅ Emergency notification sent to driver`);
     }
 
-    // Auto-assign hospital if found
+    // Store suggested hospital but don't assign yet
     if (nearestHospital) {
-      emergency.assignedHospital = nearestHospital._id;
-      console.log(`🏥 Hospital assigned: ${nearestHospital.name}`);
+      console.log(`🏥 Suggested hospital: ${nearestHospital.name}`);
     }
 
     await emergency.save();

@@ -8,6 +8,7 @@ import {
   getDrivers,
   getNearbyDrivers,
   getUserStats,
+  updateDriverStatus,
 } from "../controllers/userController.js";
 import { validateObjectId } from "../middlewares/validation.js";
 import { authenticate, adminOnly } from "../middlewares/auth.js";
@@ -34,6 +35,13 @@ router.get("/drivers", authenticate, adminOnly, getDrivers);
  * @access  Private (Admin only)
  */
 router.get("/drivers/nearby", authenticate, adminOnly, getNearbyDrivers);
+
+/**
+ * @route   PUT /api/v1/users/driver/status
+ * @desc    Update driver status (available/busy/offline)
+ * @access  Private (Driver only)
+ */
+router.put("/driver/status", authenticate, updateDriverStatus);
 
 /**
  * @route   GET /api/v1/users/:id

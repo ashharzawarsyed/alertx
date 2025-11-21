@@ -107,6 +107,44 @@ export default function HomeScreen() {
       }
     });
 
+    // Listen for driver acceptance
+    socketRef.current.on('emergency:accepted', (data: { 
+      emergencyId: string; 
+      driver: any; 
+      hospital: any; 
+      status: string;
+    }) => {
+      console.log('✅ Driver accepted emergency:', data);
+      
+      if (activeEmergency?._id === data.emergencyId) {
+        // Update active emergency with driver info
+        setActiveEmergency(prev => prev ? {
+          ...prev,
+          status: data.status,
+          assignedDriver: data.driver.id,
+        } : null);
+
+        // Show notification to patient
+        Alert.alert(
+          '✅ Driver Accepted!',
+          `${data.driver.name} has accepted your emergency.\n\n` +
+          `📞 Phone: ${data.driver.phone}\n` +
+          `🚑 Vehicle: ${data.driver.ambulanceNumber}\n` +
+          `🏥 Hospital: ${data.hospital.name}`,
+          [
+            {
+              text: 'Track Ambulance',
+              onPress: () => router.push({
+                pathname: '/emergency/tracking' as any,
+                params: { emergencyId: data.emergencyId },
+              }),
+            },
+            { text: 'OK' }
+          ]
+        );
+      }
+    });
+
     return () => {
       if (socketRef.current) {
         socketRef.current.disconnect();
@@ -258,26 +296,24 @@ export default function HomeScreen() {
         // Show first aid guide
         setShowFirstAidGuide(true);
         
-        // Build alert message with driver details if available
+        // Build alert message - driver will be assigned when they accept
         const driverInfo = response.data.ambulance?.driver;
-        let alertMessage = `${ambulance.type} ambulance dispatched!\n`;
+        let alertMessage = `Emergency request sent successfully!\n`;
         
         if (driverInfo) {
-          alertMessage += `\n👨‍⚕️ Driver: ${driverInfo.name}`;
-          alertMessage += `\n📞 Phone: ${driverInfo.phone}`;
-          alertMessage += `\n🚑 Vehicle: ${driverInfo.ambulanceNumber || ambulance.vehicleNumber}`;
-          alertMessage += `\n⏱️ ETA: ${ambulance.eta} minutes`;
+          alertMessage += `\n📡 Notifying nearby driver: ${driverInfo.name}`;
+          alertMessage += `\n⏳ Waiting for driver to accept...`;
         } else {
-          alertMessage += `\nSearching for available driver...`;
-          alertMessage += `\nETA: ${ambulance.eta} minutes`;
-          alertMessage += `\nVehicle: ${ambulance.vehicleNumber}`;
+          alertMessage += `\n🔍 Searching for available drivers...`;
+          alertMessage += `\n⏳ Please wait for driver acceptance`;
         }
         
         alertMessage += `\n\n🏥 Severity: ${analysis.severity}`;
         alertMessage += `\n✅ Confidence: ${Math.round(analysis.confidence)}%`;
+        alertMessage += `\n\nYou will be notified when a driver accepts your emergency.`;
 
         Alert.alert(
-          "🚨 Emergency Dispatched",
+          "🚨 Emergency Request Sent",
           alertMessage,
           [
             {
@@ -285,12 +321,7 @@ export default function HomeScreen() {
               onPress: () => setShowFirstAidGuide(true),
             },
             {
-              text: "Track Ambulance",
-              onPress: () =>
-                router.push({
-                  pathname: "/emergency/tracking" as any,
-                  params: { emergencyId: response.data!.emergency._id },
-                }),
+              text: "OK",
             },
           ]
         );
