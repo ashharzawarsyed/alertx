@@ -203,7 +203,103 @@ class AuthService {
   }
 
   /**
-   * Register new driver
+   * Request OTP for registration
+   */
+  async requestRegistrationOTP(data: { name: string; email: string }): Promise<RegisterResponse> {
+    try {
+      console.log('📧 Requesting registration OTP...');
+      console.log('📤 Email:', data.email);
+
+      const response = await this.api.post<RegisterResponse>('/auth/register/otp/request', data);
+
+      console.log('✅ OTP sent successfully');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ OTP request error:', error);
+      console.error('❌ Response status:', error.response?.status);
+      console.error('❌ Response data:', JSON.stringify(error.response?.data, null, 2));
+
+      if (error.response?.data) {
+        return error.response.data;
+      }
+
+      return {
+        success: false,
+        message: error.message || 'Failed to send OTP',
+        errors: [error.message || 'Network error'],
+      };
+    }
+  }
+
+  /**
+   * Validate OTP code
+   */
+  async validateRegistrationOTP(data: { email: string; otp: string }): Promise<RegisterResponse> {
+    try {
+      console.log('🔍 Validating OTP...');
+
+      const response = await this.api.post<RegisterResponse>('/auth/register/otp/validate', data);
+
+      console.log('✅ OTP validated successfully');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ OTP validation error:', error);
+
+      if (error.response?.data) {
+        return error.response.data;
+      }
+
+      return {
+        success: false,
+        message: error.message || 'Invalid or expired OTP',
+        errors: [error.message || 'Network error'],
+      };
+    }
+  }
+
+  /**
+   * Verify OTP and register driver
+   */
+  async verifyOTPAndRegister(data: {
+    email: string;
+    otp: string;
+    name: string;
+    phone: string;
+    password: string;
+    role: 'driver';
+    driverInfo: {
+      licenseNumber: string;
+      ambulanceNumber: string;
+      status: 'available' | 'busy' | 'offline';
+    };
+  }): Promise<RegisterResponse> {
+    try {
+      console.log('📝 Verifying OTP and registering driver...');
+      console.log('📤 Registration data:', JSON.stringify({ ...data, password: '***' }, null, 2));
+
+      const response = await this.api.post<RegisterResponse>('/auth/register/otp/verify', data);
+
+      console.log('✅ Registration successful');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Registration error:', error);
+      console.error('❌ Response status:', error.response?.status);
+      console.error('❌ Response data:', JSON.stringify(error.response?.data, null, 2));
+
+      if (error.response?.data) {
+        return error.response.data;
+      }
+
+      return {
+        success: false,
+        message: error.message || 'Registration failed',
+        errors: [error.message || 'Network error'],
+      };
+    }
+  }
+
+  /**
+   * Register new driver (legacy method - direct registration without OTP)
    */
   async register(data: RegisterData): Promise<RegisterResponse> {
     try {

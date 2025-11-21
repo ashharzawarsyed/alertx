@@ -147,11 +147,9 @@ const emergencySchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
+    autoIndex: false, // Prevent automatic index creation
   }
 );
-
-// Index for geospatial queries
-emergencySchema.index({ location: "2dsphere" });
 
 // Indexes for efficient queries
 emergencySchema.index({ patient: 1, createdAt: -1 });

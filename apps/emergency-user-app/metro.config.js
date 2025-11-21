@@ -30,4 +30,9 @@ config.transformer = {
   }),
 };
 
+// Disable symbolication to avoid InternalBytecode.js errors
+config.symbolicator = {
+  customizeFrame: () => null,
+};
+
 module.exports = config;

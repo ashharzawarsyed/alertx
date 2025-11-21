@@ -10,6 +10,7 @@ import debugRoutes from "./debugRoutes.js";
 import globalSearchRoutes from "./globalSearchRoutes.js";
 import patientRoutes from "./patientRoutes.js";
 import ambulanceRoutes from "./ambulanceRoutes.js";
+import firstAidRoutes from "./firstAidRoutes.js";
 
 const router = express.Router();
 
@@ -25,6 +26,7 @@ router.use("/debug", debugRoutes);
 router.use("/global-search", globalSearchRoutes);
 router.use("/patients", patientRoutes);
 router.use("/ambulances", ambulanceRoutes);
+router.use("/first-aid", firstAidRoutes);
 
 // API Info
 router.get("/", (req, res) => {
@@ -41,6 +43,7 @@ router.get("/", (req, res) => {
       trips: "/api/v1/trips",
       patients: "/api/v1/patients",
       ambulances: "/api/v1/ambulances",
+      "first-aid": "/api/v1/first-aid",
     },
     timestamp: new Date().toISOString(),
   });

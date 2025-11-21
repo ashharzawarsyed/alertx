@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { EmergencyType } from '../services/symptomAnalyzer';
+import FirstAidChatbot from './FirstAidChatbot';
 
 interface FirstAidStep {
   step: number;
@@ -367,6 +368,7 @@ export const FirstAidGuide: React.FC<FirstAidGuideProps> = ({
   ambulanceETA,
 }) => {
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
+  const [showChatbot, setShowChatbot] = useState(false);
 
   const steps = firstAidData[emergencyType] || firstAidData.general;
 
@@ -425,6 +427,19 @@ export const FirstAidGuide: React.FC<FirstAidGuideProps> = ({
             </View>
           )}
         </View>
+
+        {/* AI Chatbot Button */}
+        <TouchableOpacity 
+          style={styles.chatbotButton}
+          onPress={() => setShowChatbot(true)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.chatbotButtonContent}>
+            <Ionicons name="chatbubbles" size={22} color="#fff" />
+            <Text style={styles.chatbotButtonText}>Ask AI Assistant</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#fff" />
+        </TouchableOpacity>
 
         {/* First Aid Steps */}
         <ScrollView style={styles.scrollView}>
@@ -492,6 +507,14 @@ export const FirstAidGuide: React.FC<FirstAidGuideProps> = ({
           </View>
         </ScrollView>
       </View>
+
+      {/* First Aid Chatbot Modal */}
+      <FirstAidChatbot
+        visible={showChatbot}
+        onClose={() => setShowChatbot(false)}
+        emergencyType={emergencyType}
+        severity={severity}
+      />
     </Modal>
   );
 };
@@ -633,4 +656,31 @@ const styles = StyleSheet.create({
     color: '#4B5563',
     lineHeight: 22,
   },
+  chatbotButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#3B82F6',
+    marginHorizontal: 16,
+    marginVertical: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  chatbotButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  chatbotButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });
+

@@ -9,6 +9,8 @@ import {
   PanResponder,
   Dimensions,
   Platform,
+  ScrollView,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,6 +21,8 @@ import { EmergencySymptomModal } from "../../components/EmergencySymptomModal";
 import { FirstAidGuide } from "../../components/FirstAidGuide";
 import { ambulanceDispatcher, DispatchedAmbulance } from "../../services/ambulanceDispatcher";
 import { TriageResult } from "../../services/symptomAnalyzer";
+import io from 'socket.io-client';
+import Config from '../../config/config';
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const SLIDER_WIDTH = SCREEN_WIDTH - 48; // 24px padding on each side
@@ -41,6 +45,8 @@ export default function HomeScreen() {
   const [emergencyContacts, setEmergencyContacts] = useState<
     EmergencyContact[]
   >([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const lastCreatedEmergencyId = useRef<string | null>(null);
   
   // NLP Integration States
   const [showSymptomModal, setShowSymptomModal] = useState(false);
@@ -49,6 +55,65 @@ export default function HomeScreen() {
   const [dispatchedAmbulance, setDispatchedAmbulance] = useState<DispatchedAmbulance | null>(null);
 
   const pan = useRef(new Animated.Value(0)).current;
+  const socketRef = useRef<any>(null);
+
+  // Setup socket connection for real-time updates
+  useEffect(() => {
+    if (!user) return;
+
+    // Get token from authStore
+    const token = useAuthStore.getState().token;
+    if (!token) return;
+
+    // Connect to socket
+    const baseURL = Config.API_URL.replace('/api/v1', '');
+    socketRef.current = io(baseURL, {
+      auth: { token },
+      transports: ['websocket', 'polling'],
+    });
+
+    socketRef.current.on('connect', () => {
+      console.log('🔌 Socket connected for emergency updates');
+    });
+
+    // Listen for emergency cancellation
+    socketRef.current.on('emergency:cancelled', (data: { emergencyId: string; reason: string }) => {
+      console.log('❌ Emergency cancelled:', data);
+      if (activeEmergency?._id === data.emergencyId) {
+        // Reset slider immediately
+        Animated.spring(pan, {
+          toValue: 0,
+          useNativeDriver: Platform.OS !== 'web',
+          tension: 100,
+          friction: 10,
+        }).start();
+
+        // Clear active emergency
+        setActiveEmergency(null);
+
+        Alert.alert(
+          'Emergency Cancelled',
+          data.reason || 'Your emergency has been cancelled. You can now request a new emergency.',
+          [{ text: 'OK' }]
+        );
+      }
+    });
+
+    // Listen for emergency status updates
+    socketRef.current.on('emergency:updated', (data: { emergency: Emergency }) => {
+      console.log('🔄 Emergency updated:', data);
+      if (activeEmergency?._id === data.emergency._id) {
+        setActiveEmergency(data.emergency);
+      }
+    });
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        console.log('🔌 Socket disconnected');
+      }
+    };
+  }, [user, activeEmergency?._id]);
 
   // Create PanResponder
   const panResponder = useRef(
@@ -112,6 +177,13 @@ export default function HomeScreen() {
     }
   }, [fetchActiveEmergency, user]);
 
+  // Handle pull to refresh
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchActiveEmergency();
+    setRefreshing(false);
+  }, [fetchActiveEmergency]);
+
   // Handle symptom analysis completion
   const handleAnalysisComplete = async (analysis: TriageResult) => {
     console.log('🔬 Analysis received:', analysis);
@@ -135,7 +207,7 @@ export default function HomeScreen() {
       setDispatchedAmbulance(ambulance);
 
       // Get actual symptoms from analysis
-      const actualSymptoms = analysis.detectedSymptoms?.map(s => s.keyword) || [];
+      const actualSymptoms = analysis.detectedSymptoms?.map((s: any) => s.keyword) || [];
       const symptomsText = actualSymptoms.length > 0 
         ? actualSymptoms.join(', ')
         : `${analysis.emergencyType} emergency`;
@@ -147,15 +219,66 @@ export default function HomeScreen() {
         { symptoms: symptomsText, description: `AI-analyzed: ${analysis.emergencyType} (${analysis.severity} severity)` }
       );
 
+      if (!response.success) {
+        // Handle "already have active emergency" error
+        if (response.message?.includes('already have an active emergency')) {
+          Alert.alert(
+            "Active Emergency Detected",
+            "You already have an emergency in progress. Please wait for the current emergency to be resolved before creating a new one.",
+            [
+              {
+                text: "Track Current Emergency",
+                onPress: async () => {
+                  const active = await emergencyService.getActiveEmergency();
+                  if (active?.data?.emergency) {
+                    setActiveEmergency(active.data.emergency);
+                    router.push({
+                      pathname: "/emergency/tracking" as any,
+                      params: { emergencyId: active.data.emergency._id },
+                    });
+                  }
+                },
+              },
+              { text: "OK", style: "cancel" },
+            ]
+          );
+          return;
+        }
+        
+        // Other errors
+        Alert.alert('Error', response.message || 'Failed to dispatch ambulance. Please try again.');
+        return;
+      }
+
       if (response.success && response.data) {
         setActiveEmergency(response.data.emergency);
+        // Track this emergency ID to prevent duplicate notifications
+        lastCreatedEmergencyId.current = response.data.emergency._id;
         
         // Show first aid guide
         setShowFirstAidGuide(true);
         
+        // Build alert message with driver details if available
+        const driverInfo = response.data.ambulance?.driver;
+        let alertMessage = `${ambulance.type} ambulance dispatched!\n`;
+        
+        if (driverInfo) {
+          alertMessage += `\n👨‍⚕️ Driver: ${driverInfo.name}`;
+          alertMessage += `\n📞 Phone: ${driverInfo.phone}`;
+          alertMessage += `\n🚑 Vehicle: ${driverInfo.ambulanceNumber || ambulance.vehicleNumber}`;
+          alertMessage += `\n⏱️ ETA: ${ambulance.eta} minutes`;
+        } else {
+          alertMessage += `\nSearching for available driver...`;
+          alertMessage += `\nETA: ${ambulance.eta} minutes`;
+          alertMessage += `\nVehicle: ${ambulance.vehicleNumber}`;
+        }
+        
+        alertMessage += `\n\n🏥 Severity: ${analysis.severity}`;
+        alertMessage += `\n✅ Confidence: ${Math.round(analysis.confidence)}%`;
+
         Alert.alert(
           "🚨 Emergency Dispatched",
-          `${ambulance.type} ambulance dispatched!\n\nETA: ${ambulance.eta} minutes\nVehicle: ${ambulance.vehicleNumber}\n\nSeverity: ${analysis.severity}\nConfidence: ${Math.round(analysis.confidence)}%`,
+          alertMessage,
           [
             {
               text: "View First Aid",
@@ -265,96 +388,130 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* User Greeting & Emergency Contacts */}
-      <View style={styles.userSection}>
-        <View style={styles.greetingContainer}>
-          <Text style={styles.greeting}>
-            Hi, {user?.name?.split(" ")[0] || "George"}!
-          </Text>
-          <TouchableOpacity
-            style={styles.userAvatar}
-            onPress={() => router.push("/(tabs)/profile")}
-          >
-            <Text style={styles.avatarText}>
-              {getInitials(user?.name || "User")}
+      <ScrollView
+        style={styles.scrollContent}
+        contentContainerStyle={styles.scrollContentContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#EF4444"
+            colors={["#EF4444"]}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        {/* User Greeting & Emergency Contacts */}
+        <View style={styles.userSection}>
+          <View style={styles.greetingContainer}>
+            <Text style={styles.greeting}>
+              Hi, {user?.name?.split(" ")[0] || "George"}!
             </Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={styles.userAvatar}
+              onPress={() => router.push("/(tabs)/profile")}
+            >
+              <Text style={styles.avatarText}>
+                {getInitials(user?.name || "User")}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-        <View style={styles.contactsRow}>
-          <Text style={styles.contactsLabel}>
-            Your SOS will be sent to {emergencyContacts.length || 4} people
-          </Text>
-          <View style={styles.contactAvatars}>
-            {emergencyContacts.length > 0 ? (
-              emergencyContacts.map((contact, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.contactAvatar,
-                    { backgroundColor: getContactColor(index) },
-                  ]}
-                >
-                  <Text style={styles.contactInitials}>
-                    {getInitials(contact.name)}
-                  </Text>
-                </View>
-              ))
-            ) : (
-              <>
-                <View
-                  style={[styles.contactAvatar, { backgroundColor: "#EF4444" }]}
-                >
-                  <Text style={styles.contactInitials}>KE</Text>
-                </View>
-                <View
-                  style={[styles.contactAvatar, { backgroundColor: "#3B82F6" }]}
-                >
-                  <Text style={styles.contactInitials}>AM</Text>
-                </View>
-                <View
-                  style={[styles.contactAvatar, { backgroundColor: "#F97316" }]}
-                >
-                  <Text style={styles.contactInitials}>RJ</Text>
-                </View>
-                <View
-                  style={[styles.contactAvatar, { backgroundColor: "#8B5CF6" }]}
-                >
-                  <Text style={styles.contactInitials}>JA</Text>
-                </View>
-              </>
-            )}
+          <View style={styles.contactsRow}>
+            <Text style={styles.contactsLabel}>
+              Your SOS will be sent to {emergencyContacts.length || 4} people
+            </Text>
+            <View style={styles.contactAvatars}>
+              {emergencyContacts.length > 0 ? (
+                emergencyContacts.map((contact, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.contactAvatar,
+                      { backgroundColor: getContactColor(index) },
+                    ]}
+                  >
+                    <Text style={styles.contactInitials}>
+                      {getInitials(contact.name)}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <>
+                  <View
+                    style={[styles.contactAvatar, { backgroundColor: "#EF4444" }]}
+                  >
+                    <Text style={styles.contactInitials}>KE</Text>
+                  </View>
+                  <View
+                    style={[styles.contactAvatar, { backgroundColor: "#3B82F6" }]}
+                  >
+                    <Text style={styles.contactInitials}>AM</Text>
+                  </View>
+                  <View
+                    style={[styles.contactAvatar, { backgroundColor: "#F97316" }]}
+                  >
+                    <Text style={styles.contactInitials}>RJ</Text>
+                  </View>
+                  <View
+                    style={[styles.contactAvatar, { backgroundColor: "#8B5CF6" }]}
+                  >
+                    <Text style={styles.contactInitials}>JA</Text>
+                  </View>
+                </>
+              )}
+            </View>
           </View>
         </View>
-      </View>
 
-      {/* Main Content Area - Non-Scrollable */}
-      <View style={styles.mainContent}>
+        {/* Main Content Area */}
+        <View style={styles.mainContent}>
         {/* Active Emergency Alert */}
         {activeEmergency && (
-          <TouchableOpacity
-            style={styles.activeEmergencyBanner}
-            onPress={() =>
-              router.push({
-                pathname: "/emergency/tracking" as any,
-                params: { emergencyId: activeEmergency._id },
-              })
-            }
-            activeOpacity={0.7}
-          >
-            <View style={styles.activeEmergencyContent}>
-              <Ionicons name="alert-circle" size={24} color="#DC2626" />
+          <View style={[
+            styles.activeEmergencyBanner,
+            activeEmergency.status === 'cancelled' && styles.cancelledEmergencyBanner
+          ]}>
+            <TouchableOpacity
+              style={styles.activeEmergencyContent}
+              onPress={() => {
+                if (activeEmergency.status === 'cancelled') {
+                  setActiveEmergency(null);
+                } else {
+                  router.push({
+                    pathname: "/emergency/tracking" as any,
+                    params: { emergencyId: activeEmergency._id },
+                  });
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons 
+                name={activeEmergency.status === 'cancelled' ? 'close-circle' : 'alert-circle'} 
+                size={24} 
+                color={activeEmergency.status === 'cancelled' ? '#6B7280' : '#DC2626'} 
+              />
               <View style={styles.activeEmergencyText}>
-                <Text style={styles.activeEmergencyTitle}>
-                  Active Emergency
+                <Text style={[
+                  styles.activeEmergencyTitle,
+                  activeEmergency.status === 'cancelled' && styles.cancelledText
+                ]}>
+                  {activeEmergency.status === 'cancelled' ? 'Emergency Cancelled' : 'Active Emergency'}
                 </Text>
-                <Text style={styles.activeEmergencySubtitle}>
-                  Status: {activeEmergency.status.replace("_", " ")} • Tap to track
+                <Text style={[
+                  styles.activeEmergencySubtitle,
+                  activeEmergency.status === 'cancelled' && styles.cancelledText
+                ]}>
+                  Status: {activeEmergency.status.replace("_", " ")} • {activeEmergency.status === 'cancelled' ? 'Tap to dismiss' : 'Tap to track'}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={24} color="#DC2626" />
-            </View>
-          </TouchableOpacity>
+              <Ionicons 
+                name={activeEmergency.status === 'cancelled' ? 'close' : 'chevron-forward'} 
+                size={24} 
+                color={activeEmergency.status === 'cancelled' ? '#6B7280' : '#DC2626'} 
+              />
+            </TouchableOpacity>
+          </View>
         )}
 
         {/* Quick Actions - Minimalist Design */}
@@ -432,6 +589,7 @@ export default function HomeScreen() {
           )}
         </View>
       </View>
+      </ScrollView>
 
       {/* Bottom Slider */}
       <View style={styles.sliderContainer}>
@@ -485,6 +643,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
+  },
+  scrollContent: {
+    flex: 1,
+  },
+  scrollContentContainer: {
+    flexGrow: 1,
   },
   topBar: {
     flexDirection: "row",
@@ -603,8 +767,15 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   activeEmergencySubtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: "#991B1B",
+  },
+  cancelledEmergencyBanner: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#D1D5DB',
+  },
+  cancelledText: {
+    color: '#6B7280',
   },
   quickActionsContainer: {
     flexDirection: "row",

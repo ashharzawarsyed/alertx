@@ -82,6 +82,25 @@ export const initializeSocket = (server) => {
 const handleDriverEvents = (socket) => {
   // Join driver location updates room
   socket.join("drivers_location");
+  
+  console.log(`✅ Driver joined rooms:`, {
+    driverId: socket.userId,
+    rooms: [`user_${socket.userId}`, 'role_driver', 'drivers_location']
+  });
+
+  // Driver connected notification
+  socket.on("driver:connected", (data) => {
+    console.log(`👋 Driver connected event received:`, {
+      driverId: socket.userId,
+      timestamp: data.timestamp
+    });
+    
+    // Confirm connection by emitting back
+    socket.emit("connection:confirmed", {
+      userId: socket.userId,
+      timestamp: new Date().toISOString()
+    });
+  });
 
   // Location update
   socket.on("driver:updateLocation", (data) => {
@@ -205,8 +224,25 @@ export const getSocketInstance = () => {
  * Emit event to specific user
  */
 export const emitToUser = (userId, event, data) => {
-  if (!io) return;
-  io.to(`user_${userId}`).emit(event, data);
+  if (!io) {
+    console.error('❌ Socket.IO not initialized - cannot emit to user');
+    return;
+  }
+  
+  const room = `user_${userId}`;
+  const socketsInRoom = io.sockets.adapter.rooms.get(room);
+  
+  console.log(`📡 emitToUser called:`, {
+    userId,
+    event,
+    room,
+    socketsInRoom: socketsInRoom ? Array.from(socketsInRoom) : 'none',
+    connectedCount: socketsInRoom?.size || 0
+  });
+  
+  io.to(room).emit(event, data);
+  
+  console.log(`✅ Event '${event}' emitted to room '${room}'`);
 };
 
 /**

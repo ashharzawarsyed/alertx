@@ -22,11 +22,21 @@ import {
 export const register = asyncHandler(async (req, res) => {
   const { name, email, phone, password, role, location, notifiers } = req.body;
 
+  // Log registration attempt for debugging
+  console.log('📝 Registration attempt:', {
+    role,
+    email,
+    phone,
+    hasDriverInfo: !!req.body.driverInfo,
+    driverInfo: req.body.driverInfo
+  });
+
   // Check if user already exists
   const existingUser = await User.findOne({
     $or: [{ email }, { phone }],
   });
   if (existingUser) {
+    console.log('❌ Registration failed: User already exists');
     return sendResponse(
       res,
       RESPONSE_CODES.CONFLICT,
@@ -57,16 +67,42 @@ export const register = asyncHandler(async (req, res) => {
 
   if (role === USER_ROLES.DRIVER) {
     const { driverInfo } = req.body;
-    const { licenseNumber, ambulanceNumber } = driverInfo || req.body;
+    
+    // Extract driver info - try from driverInfo object first, then from req.body directly
+    const licenseNumber = driverInfo?.licenseNumber || req.body.licenseNumber;
+    const ambulanceNumber = driverInfo?.ambulanceNumber || req.body.ambulanceNumber;
+    
+    // Validation - should already be handled by middleware, but double-check
+    if (!licenseNumber || !ambulanceNumber) {
+      return sendResponse(
+        res,
+        RESPONSE_CODES.BAD_REQUEST,
+        "License number and ambulance number are required for drivers"
+      );
+    }
+    
     userData.driverInfo = {
-      licenseNumber,
-      ambulanceNumber,
-      status: "offline",
+      licenseNumber: licenseNumber.trim(),
+      ambulanceNumber: ambulanceNumber.trim(),
+      status: driverInfo?.status || "offline",
     };
   }
 
   // Create user
+  console.log('Creating user with data:', {
+    role: userData.role,
+    email: userData.email,
+    phone: userData.phone,
+    hasDriverInfo: !!userData.driverInfo
+  });
+  
   const user = await User.create(userData);
+  
+  console.log('✅ User created successfully:', {
+    id: user._id,
+    role: user.role,
+    email: user.email
+  });
 
   // If admin registration, set as pending and notify existing admins
   if (role === USER_ROLES.ADMIN) {
@@ -667,7 +703,7 @@ export const requestRegistrationOTP = asyncHandler(async (req, res) => {
 
   // Generate OTP
   const otp = generateOTP(6);
-  const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+  const otpExpires = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
 
   try {
     // Send OTP email

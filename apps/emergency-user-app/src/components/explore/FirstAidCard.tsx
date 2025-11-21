@@ -114,21 +114,18 @@ export default function FirstAidCard({
         transparent
         onRequestClose={handleClose}
       >
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={handleClose}
-          style={[
+        <View style={[
             styles.modalOverlay,
             { paddingBottom: insets.bottom + BOTTOM_BAR_HEIGHT },
-          ]}
-        >
+          ]}>
           <TouchableOpacity
             activeOpacity={1}
-            onPress={(e) => e.stopPropagation()}
+            onPress={handleClose}
+            style={styles.modalBackdrop}
+          />
+          <View
+            style={[styles.modalContent, { paddingBottom: insets.bottom + 24 }]}
           >
-            <View
-              style={[styles.modalContent, { paddingBottom: insets.bottom + 24 }]}
-            >
               {/* Modal Header */}
               <View style={styles.modalHeader}>
               <View style={styles.modalTitleContainer}>
@@ -230,8 +227,7 @@ export default function FirstAidCard({
               <View style={{ height: insets.bottom + 16 }} />
             </ScrollView>
           </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
+        </View>
       </Modal>
     </>
   );
@@ -295,11 +291,14 @@ const styles = StyleSheet.create({
   // Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "flex-end",
   },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
   modalContent: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#FFF",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: "85%",

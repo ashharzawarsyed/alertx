@@ -62,6 +62,27 @@ export interface EmergencyResponse {
   message: string;
   data?: {
     emergency: Emergency;
+    ambulance?: {
+      type: string;
+      driver?: {
+        name: string;
+        phone: string;
+        vehicleNumber?: string;
+        ambulanceNumber?: string;
+        ambulanceType?: string;
+      };
+      hospital?: {
+        name: string;
+        address: string;
+      };
+      eta?: number;
+    };
+    aiAnalysis?: {
+      emergencyType: string;
+      severity: string;
+      confidence: number;
+      recommendations: string[];
+    };
   };
   errors?: string[];
 }

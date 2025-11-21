@@ -195,9 +195,9 @@ export default function EmergenciesScreen() {
               );
               
               if (response.success) {
-                Alert.alert("Success", "Emergency cancelled successfully");
+                Alert.alert("Success", "Emergency cancelled successfully. You can now request a new emergency.");
                 closeModal();
-                fetchEmergencies();
+                await fetchEmergencies();
               } else {
                 Alert.alert("Error", response.message || "Failed to cancel emergency");
               }
@@ -506,27 +506,26 @@ export default function EmergenciesScreen() {
       <Modal
         visible={modalVisible}
         transparent
-        animationType="none"
+        animationType="fade"
+        statusBarTranslucent
         onRequestClose={closeModal}
       >
-        <TouchableOpacity 
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={closeModal}
-        >
+        <View style={styles.modalOverlay}>
           <TouchableOpacity 
+            style={styles.modalBackdrop}
             activeOpacity={1}
-            onPress={(e) => e.stopPropagation()}
-            style={{ flex: 1, justifyContent: "flex-end" }}
+            onPress={closeModal}
+          />
+          <Animated.View
+            style={[
+              styles.modalContent,
+              { transform: [{ translateY: slideAnim }] },
+            ]}
           >
-            <Animated.View
-              style={[
-                styles.modalContent,
-                { transform: [{ translateY: slideAnim }] },
-              ]}
-            >
-              {/* Handle Bar */}
+            {/* Handle Bar */}
+            <TouchableOpacity onPress={closeModal} activeOpacity={0.8}>
               <View style={styles.modalHandle} />
+            </TouchableOpacity>
 
               <ScrollView
                 style={styles.modalScroll}
@@ -717,8 +716,7 @@ export default function EmergenciesScreen() {
               <View style={{ height: 40 }} />
             </ScrollView>
           </Animated.View>
-          </TouchableOpacity>
-        </TouchableOpacity>
+        </View>
       </Modal>
     );
   };
@@ -1103,6 +1101,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "flex-end",
+    zIndex: 9999,
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -1113,6 +1112,11 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     maxHeight: SCREEN_HEIGHT * 0.9,
     paddingTop: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 10,
   },
   modalHandle: {
     width: 40,

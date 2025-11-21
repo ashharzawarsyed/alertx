@@ -10,6 +10,7 @@ import {
   dispatchIntelligentAmbulance,
   markPickedUp,
   markArrivedAtHospital,
+  cancelEmergency,
 } from "../controllers/emergencyController.js";
 import {
   validateEmergencyRequest,
@@ -129,5 +130,17 @@ router.put(
  * @access  Private
  */
 router.post("/:id/notes", authenticate, validateObjectId("id"), addNote);
+
+/**
+ * @route   POST /api/v1/emergencies/:id/cancel
+ * @desc    Cancel emergency request
+ * @access  Private (Patient who created it)
+ */
+router.post(
+  "/:id/cancel",
+  authenticate,
+  validateObjectId("id"),
+  cancelEmergency
+);
 
 export default router;

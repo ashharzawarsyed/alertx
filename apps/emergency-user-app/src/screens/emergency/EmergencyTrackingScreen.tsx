@@ -453,9 +453,30 @@ export default function EmergencyTrackingScreen() {
                   <Text style={styles.driverName}>
                     {(emergency.assignedDriver as any).name || "Driver"}
                   </Text>
-                  <Text style={styles.driverSubtext}>
-                    {emergency.assignedAmbulance?.vehicleNumber || "Ambulance"}
-                  </Text>
+                  {(emergency.assignedDriver as any).phone && (
+                    <View style={styles.contactRow}>
+                      <Ionicons name="call" size={16} color="#6B7280" />
+                      <Text style={styles.driverSubtext}>
+                        {(emergency.assignedDriver as any).phone}
+                      </Text>
+                    </View>
+                  )}
+                  {(emergency.assignedDriver as any).driverInfo?.ambulanceNumber && (
+                    <View style={styles.contactRow}>
+                      <Ionicons name="medical" size={16} color="#6B7280" />
+                      <Text style={styles.driverSubtext}>
+                        {(emergency.assignedDriver as any).driverInfo.ambulanceNumber}
+                      </Text>
+                    </View>
+                  )}
+                  {(emergency.assignedDriver as any).driverInfo?.licenseNumber && (
+                    <View style={styles.contactRow}>
+                      <Ionicons name="card" size={16} color="#6B7280" />
+                      <Text style={styles.driverSubtext}>
+                        License: {(emergency.assignedDriver as any).driverInfo.licenseNumber}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               </View>
             </View>
@@ -841,6 +862,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#6B7280",
     marginTop: 2,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
   },
 
   // Hospital Info

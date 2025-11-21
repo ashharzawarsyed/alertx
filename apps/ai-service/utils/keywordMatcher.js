@@ -43,7 +43,6 @@ const MEDICAL_KEYWORDS = {
     "poisoning",
     "anaphylaxis",
     "severe allergic reaction",
-    "high fever",
     "hypothermia",
   ],
 
@@ -68,7 +67,6 @@ const MEDICAL_KEYWORDS = {
     "intense headache",
 
     // Infections
-    "high fever",
     "fever with rash",
     "infection severe",
     "pneumonia symptoms",

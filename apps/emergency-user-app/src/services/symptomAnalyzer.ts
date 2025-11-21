@@ -53,8 +53,17 @@ class SymptomAnalyzer {
   private aiServiceUrl: string;
 
   constructor() {
-    // AI service runs on port 3001
-    this.aiServiceUrl = 'http://localhost:3001';
+    // Get dynamic IP from config
+    const debuggerHost = require('expo-constants').default?.expoConfig?.hostUri;
+    if (debuggerHost) {
+      const ip = debuggerHost.split(':')[0];
+      this.aiServiceUrl = `http://${ip}:8000`;
+      console.log('🤖 AI Service URL (Auto-detected):', this.aiServiceUrl);
+    } else {
+      // Fallback for different platforms
+      this.aiServiceUrl = 'http://localhost:8000';
+      console.log('🤖 AI Service URL (Fallback):', this.aiServiceUrl);
+    }
   }
 
   /**

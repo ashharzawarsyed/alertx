@@ -76,34 +76,36 @@ export default function ForgotPasswordScreen() {
 
   const handleResetPassword = async () => {
     if (!code.trim()) {
-      Alert.alert('Error', 'Please enter the reset code');
+      Alert.alert('Validation Error', 'Please enter the reset code');
       return;
     }
 
     if (code.trim().length !== 6 || !/^[0-9]+$/.test(code.trim())) {
-      Alert.alert('Error', 'Reset code must be 6 digits');
+      Alert.alert('Validation Error', 'Reset code must be 6 digits');
       return;
     }
 
     const passwordError = validatePassword(newPassword);
     if (passwordError) {
-      Alert.alert('Error', passwordError);
+      Alert.alert('Password Error', passwordError);
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      Alert.alert('Password Error', 'Passwords do not match');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      await authService.resetPassword(
+      const response = await authService.resetPassword(
         email.trim().toLowerCase(),
         code.trim(),
         newPassword
       );
+
+      console.log('✅ Password reset response:', response);
 
       Alert.alert(
         'Password Reset Successful! 🎉',
@@ -117,11 +119,22 @@ export default function ForgotPasswordScreen() {
       );
     } catch (error: any) {
       console.error('❌ Reset password error:', error);
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.message ||
-        'Failed to reset password. Please check the code and try again.';
-      Alert.alert('Error', errorMessage);
+      
+      // Handle error object properly
+      let errorMessage = 'Failed to reset password. Please try again.';
+      
+      if (error?.error && Array.isArray(error.error)) {
+        // Backend validation errors
+        errorMessage = error.error.join('\n');
+      } else if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.response?.data?.error && Array.isArray(error.response.data.error)) {
+        errorMessage = error.response.data.error.join('\n');
+      }
+      
+      Alert.alert('Reset Failed', errorMessage);
     } finally {
       setIsLoading(false);
     }

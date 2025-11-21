@@ -9,6 +9,19 @@ export const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     const errorMessages = errors.array().map((error) => error.msg);
+    
+    // Log validation errors for debugging
+    console.log('❌ Validation errors:', {
+      endpoint: req.path,
+      errors: errorMessages,
+      body: {
+        role: req.body.role,
+        email: req.body.email,
+        phone: req.body.phone,
+        hasDriverInfo: !!req.body.driverInfo
+      }
+    });
+    
     return sendResponse(
       res,
       RESPONSE_CODES.BAD_REQUEST,
@@ -328,9 +341,20 @@ export const validateForgotPassword = [
  * Reset password validation
  */
 export const validateResetPassword = [
-  body("token").notEmpty().withMessage("Reset token is required"),
+  body("email")
+    .isEmail()
+    .normalizeEmail()
+    .withMessage("Please provide a valid email"),
 
-  body("password")
+  body("code")
+    .notEmpty()
+    .withMessage("Reset code is required")
+    .isLength({ min: 6, max: 6 })
+    .withMessage("Reset code must be 6 digits")
+    .isNumeric()
+    .withMessage("Reset code must be numeric"),
+
+  body("newPassword")
     .isLength({ min: 8 })
     .withMessage("Password must be at least 8 characters long")
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
