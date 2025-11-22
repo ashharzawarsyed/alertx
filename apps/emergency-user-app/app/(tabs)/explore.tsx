@@ -139,7 +139,7 @@ export default function ExploreScreen() {
 
   const filteredHospitals: Hospital[] = searchQuery
     ? exploreService.searchHospitals(hospitals || [], searchQuery)
-    : hospitals || [];
+    : (hospitals || []);
 
   const filteredFirstAid = searchQuery
     ? firstAidGuides.filter(
@@ -426,7 +426,7 @@ export default function ExploreScreen() {
                   )}
 
                   {/* Hospital Markers */}
-                  {filteredHospitals.map((hospital) => (
+                  {Array.isArray(filteredHospitals) && filteredHospitals.map((hospital) => (
                     <Marker
                       key={hospital._id}
                       coordinate={{
@@ -446,7 +446,7 @@ export default function ExploreScreen() {
 
                 <View style={styles.mapInfoCard}>
                   <Text style={styles.mapInfoTitle}>
-                    {filteredHospitals.length} Hospital{filteredHospitals.length !== 1 ? "s" : ""} Nearby
+                    {Array.isArray(filteredHospitals) ? filteredHospitals.length : 0} Hospital{(Array.isArray(filteredHospitals) && filteredHospitals.length !== 1) ? "s" : ""} Nearby
                   </Text>
                   <Text style={styles.mapInfoSubtitle}>
                     Tap markers for details

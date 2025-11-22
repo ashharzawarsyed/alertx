@@ -99,7 +99,7 @@ const CrossPlatformMap = React.forwardRef<any, CrossPlatformMapProps>(
           icon: {
             path: google.maps.SymbolPath.CIRCLE,
             scale: 8,
-            fillColor: "#EF4444",
+            fillColor: "#10b981",
             fillOpacity: 1,
             strokeColor: "#ffffff",
             strokeWeight: 2,

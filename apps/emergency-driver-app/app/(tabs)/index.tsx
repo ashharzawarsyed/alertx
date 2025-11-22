@@ -11,12 +11,14 @@ import {
   Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as Location from 'expo-location';
 import { useAuthStore } from '@/src/store/authStore';
 import { useEmergencyStore } from '@/src/store/emergencyStore';
 import emergencyService, { Emergency } from '@/src/services/emergencyService';
 import socketService from '@/src/services/socketService';
 import locationService from '@/src/services/locationService';
 import authService from '@/src/services/authService';
+import CrossPlatformMap from '@/components/CrossPlatformMap';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -34,16 +36,42 @@ export default function HomeScreen() {
   const [isAvailable, setIsAvailable] = useState(
     user?.driverInfo?.status === 'available'
   );
+  const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   useEffect(() => {
     loadEmergencies();
     setupSocketListeners();
     requestLocationPermission();
+    fetchDriverLocation();
 
     return () => {
       socketService.offNewEmergency();
     };
   }, []);
+
+  const fetchDriverLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setLocationError('Location permission denied');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      setDriverLocation({
+        lat: location.coords.latitude,
+        lng: location.coords.longitude,
+      });
+      console.log('📍 Driver location fetched:', location.coords);
+    } catch (error) {
+      console.error('Failed to fetch driver location:', error);
+      setLocationError('Failed to get location');
+    }
+  };
 
   const requestLocationPermission = async () => {
     const result = await locationService.requestPermissions();
@@ -253,6 +281,46 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      {/* Driver Location Map */}
+      {driverLocation && (
+        <View style={styles.mapContainer}>
+          <View style={styles.mapHeader}>
+            <Text style={styles.mapTitle}>📍 Your Location</Text>
+            {incomingEmergencies.length > 0 && (
+              <Text style={styles.emergencyCount}>
+                {incomingEmergencies.length} active request{incomingEmergencies.length !== 1 ? 's' : ''}
+              </Text>
+            )}
+          </View>
+          <View style={styles.mapWrapper}>
+            <CrossPlatformMap
+              initialRegion={{
+                latitude: driverLocation.lat,
+                longitude: driverLocation.lng,
+                latitudeDelta: 0.05,
+                longitudeDelta: 0.05,
+              }}
+              markers={[
+                {
+                  latitude: driverLocation.lat,
+                  longitude: driverLocation.lng,
+                  title: "Your Location",
+                  description: "Driver position",
+                  color: "#10b981"
+                },
+                ...incomingEmergencies.map((emergency, index) => ({
+                  latitude: emergency.location.lat,
+                  longitude: emergency.location.lng,
+                  title: `Emergency ${index + 1}`,
+                  description: emergency.severityLevel,
+                  color: emergency.severityLevel === 'critical' ? '#ef4444' : '#f59e0b'
+                }))
+              ]}
+            />
+          </View>
+        </View>
+      )}
+
       {/* Emergency List */}
       {incomingEmergencies.length === 0 ? (
         <View style={styles.emptyContainer}>
@@ -433,5 +501,46 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  mapContainer: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  mapHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  mapTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  emergencyCount: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#dc2626',
+    backgroundColor: '#fee2e2',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  mapWrapper: {
+    height: 200,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
 });

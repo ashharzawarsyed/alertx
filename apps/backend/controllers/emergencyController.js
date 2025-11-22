@@ -468,15 +468,20 @@ export const acceptEmergency = asyncHandler(async (req, res) => {
   }
 
   // Find nearest hospital with available beds
+  console.log(`🔍 Finding hospital for emergency at:`, emergency.location);
   const nearestHospital = await findNearestHospital(emergency.location);
 
   if (!nearestHospital) {
+    console.error('❌ No hospital found - this should not happen. Database might be empty.');
+    console.error('💡 Make sure hospitals are seeded in the database');
     return sendResponse(
       res,
       RESPONSE_CODES.NOT_FOUND,
-      "No available hospital found nearby"
+      "No hospitals found in system. Please contact administrator."
     );
   }
+
+  console.log(`✅ Hospital assigned: ${nearestHospital.name}`);
 
   // Accept emergency
   emergency.assignedDriver = req.user.id;
@@ -615,15 +620,46 @@ export const addNote = asyncHandler(async (req, res) => {
  * Helper function to find nearest hospital
  */
 const findNearestHospital = async (location) => {
-  const hospitals = await Hospital.find({
+  console.log('🏥 Searching for hospitals near:', location);
+  
+  // First try to find hospitals with available beds
+  let hospitals = await Hospital.find({
     isActive: true,
     totalAvailableBeds: { $gt: 0 },
   });
 
+  console.log(`📊 Found ${hospitals.length} hospitals with available beds`);
+
+  // If no hospitals with beds, try any active hospital
+  if (hospitals.length === 0) {
+    console.log('⚠️ No hospitals with available beds, searching for any active hospital');
+    hospitals = await Hospital.find({ isActive: true });
+    console.log(`📊 Found ${hospitals.length} active hospitals (no bed filter)`);
+  }
+
+  // If still no hospitals, try ANY hospital in the database
+  if (hospitals.length === 0) {
+    console.log('⚠️ No active hospitals, searching for ANY hospital');
+    hospitals = await Hospital.find({});
+    console.log(`📊 Found ${hospitals.length} total hospitals in database`);
+  }
+
+  // If absolutely no hospitals exist
+  if (hospitals.length === 0) {
+    console.error('❌ No hospitals found in database at all');
+    return null;
+  }
+
+  // Find the nearest hospital
   let nearestHospital = null;
   let minDistance = Infinity;
 
   for (const hospital of hospitals) {
+    if (!hospital.location || !hospital.location.lat || !hospital.location.lng) {
+      console.warn(`⚠️ Hospital ${hospital.name} has invalid location data`);
+      continue;
+    }
+
     const distance = calculateDistance(
       location.lat,
       location.lng,
@@ -631,13 +667,18 @@ const findNearestHospital = async (location) => {
       hospital.location.lng
     );
 
-    if (
-      distance < minDistance &&
-      distance <= DISTANCE_LIMITS.MAX_HOSPITAL_SEARCH_RADIUS
-    ) {
+    console.log(`📍 Distance to ${hospital.name}: ${distance.toFixed(2)} km`);
+
+    if (distance < minDistance) {
       minDistance = distance;
       nearestHospital = hospital;
     }
+  }
+
+  if (nearestHospital) {
+    console.log(`✅ Nearest hospital: ${nearestHospital.name} (${minDistance.toFixed(2)} km away)`);
+  } else {
+    console.error('❌ Could not find any hospital with valid location');
   }
 
   return nearestHospital;
@@ -810,7 +851,7 @@ export const dispatchIntelligentAmbulance = asyncHandler(async (req, res) => {
     // Store suggested hospital but don't assign yet
     if (nearestHospital) {
       console.log(`🏥 Suggested hospital: ${nearestHospital.name}`);
-    }
+    
 
     await emergency.save();
 
@@ -821,33 +862,7 @@ export const dispatchIntelligentAmbulance = asyncHandler(async (req, res) => {
       { path: "assignedHospital", select: "name address phone location" },
     ]);
 
-    // Send real-time notification to driver via Socket.IO (after populate)
-    if (nearestDriver) {
-      try {
-        const notificationData = {
-          emergency: emergency.toObject(), // Send full emergency object
-          message: `New ${triageResult.severity} emergency: ${triageResult.emergencyType}`,
-          timestamp: new Date().toISOString(),
-        };
-        
-        console.log(`📲 Attempting socket emission to driver:`, {
-          driverId: nearestDriver._id.toString(),
-          event: 'emergency:newRequest',
-          room: `user_${nearestDriver._id}`,
-          emergencyId: emergency._id.toString()
-        });
-
-        emitToUser(nearestDriver._id.toString(), "emergency:newRequest", notificationData);
-        
-        console.log(`✅ Socket notification sent to driver: ${nearestDriver._id}`);
-      } catch (socketError) {
-        console.error("⚠️ Failed to send socket notification:", socketError);
-        console.error("⚠️ Socket error details:", {
-          message: socketError.message,
-          stack: socketError.stack
-        });
-        // Don't fail the request if socket fails
-      }
+    // Socket notification already sent above, no need to send again
     } else {
       console.log('⚠️ No driver available - socket notification not sent');
     }

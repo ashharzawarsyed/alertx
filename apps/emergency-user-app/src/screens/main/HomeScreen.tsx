@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import * as Location from "expo-location";
 import { useAuthStore } from "../../store/authStore";
 import { emergencyService, Emergency } from "../../services/emergencyService";
 import { EmergencySymptomModal } from "../../components/EmergencySymptomModal";
@@ -23,6 +24,8 @@ import { ambulanceDispatcher, DispatchedAmbulance } from "../../services/ambulan
 import { TriageResult } from "../../services/symptomAnalyzer";
 import io from 'socket.io-client';
 import Config from '../../config/config';
+import CrossPlatformMap from "../../components/CrossPlatformMap";
+import exploreService from "../../services/exploreService";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const SLIDER_WIDTH = SCREEN_WIDTH - 48; // 24px padding on each side
@@ -47,6 +50,9 @@ export default function HomeScreen() {
   >([]);
   const [refreshing, setRefreshing] = useState(false);
   const lastCreatedEmergencyId = useRef<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [nearbyHospitals, setNearbyHospitals] = useState<any[]>([]);
   
   // NLP Integration States
   const [showSymptomModal, setShowSymptomModal] = useState(false);
@@ -112,7 +118,7 @@ export default function HomeScreen() {
       emergencyId: string; 
       driver: any; 
       hospital: any; 
-      status: string;
+      status: 'accepted';
     }) => {
       console.log('✅ Driver accepted emergency:', data);
       
@@ -120,7 +126,7 @@ export default function HomeScreen() {
         // Update active emergency with driver info
         setActiveEmergency(prev => prev ? {
           ...prev,
-          status: data.status,
+          status: 'accepted' as const,
           assignedDriver: data.driver.id,
         } : null);
 
@@ -205,6 +211,52 @@ export default function HomeScreen() {
     }
   }, [user]);
 
+  // Fetch user location and nearby hospitals
+  useEffect(() => {
+    const fetchLocation = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          setLocationError("Location permission denied");
+          console.log("⚠️ Location permission denied");
+          return;
+        }
+
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        
+        const userLoc = {
+          lat: location.coords.latitude,
+          lng: location.coords.longitude,
+        };
+        
+        setUserLocation(userLoc);
+        console.log("📍 User location fetched:", location.coords);
+
+        // Fetch nearby hospitals
+        try {
+          const hospitalResponse = await exploreService.getNearbyHospitals(
+            userLoc.lat,
+            userLoc.lng,
+            10 // 10km radius
+          );
+          if (hospitalResponse.success && hospitalResponse.data) {
+            setNearbyHospitals(hospitalResponse.data.slice(0, 5)); // Show max 5 hospitals
+            console.log(`🏥 Found ${hospitalResponse.data.length} nearby hospitals`);
+          }
+        } catch (error) {
+          console.error("❌ Error fetching hospitals:", error);
+        }
+      } catch (error) {
+        console.error("❌ Error getting location:", error);
+        setLocationError("Failed to get location");
+      }
+    };
+
+    fetchLocation();
+  }, []);
+
   useEffect(() => {
     // Only fetch data if user is authenticated
     if (user) {
@@ -229,17 +281,21 @@ export default function HomeScreen() {
     setShowSymptomModal(false);
 
     try {
-      // Mock user location (in production, get from GPS)
-      const userLocation = {
-        lat: 37.7749, // San Francisco coordinates
-        lng: -122.4194,
+      // Use actual user location or fallback
+      const location = userLocation || {
+        lat: 33.6522224, // Fallback: Islamabad coordinates
+        lng: 73.0366452,
       };
+
+      if (!userLocation) {
+        console.log("⚠️ Using fallback location - GPS not available");
+      }
 
       // Dispatch ambulance based on AI analysis
       console.log('🚑 Dispatching ambulance...');
       const ambulance = await ambulanceDispatcher.dispatchAmbulance(
         analysis,
-        userLocation
+        location
       );
 
       setDispatchedAmbulance(ambulance);
@@ -253,7 +309,7 @@ export default function HomeScreen() {
       // Trigger emergency in backend with actual symptoms
       const response = await emergencyService.dispatchIntelligentAmbulance(
         analysis,
-        userLocation,
+        location,
         { symptoms: symptomsText, description: `AI-analyzed: ${analysis.emergencyType} (${analysis.severity} severity)` }
       );
 
@@ -440,7 +496,7 @@ export default function HomeScreen() {
             </Text>
             <TouchableOpacity
               style={styles.userAvatar}
-              onPress={() => router.push("/(tabs)/profile")}
+              onPress={() => router.push("/profile")}
             >
               <Text style={styles.avatarText}>
                 {getInitials(user?.name || "User")}
@@ -559,7 +615,7 @@ export default function HomeScreen() {
 
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => router.push("/(tabs)/emergencies")}
+            onPress={() => router.push("/emergencies")}
           >
             <View style={styles.actionIconContainer}>
               <Ionicons name="time-outline" size={24} color="#111827" />
@@ -569,7 +625,7 @@ export default function HomeScreen() {
 
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => router.push("/(tabs)/profile")}
+            onPress={() => router.push("/profile")}
           >
             <View style={styles.actionIconContainer}>
               <Ionicons
@@ -596,6 +652,59 @@ export default function HomeScreen() {
             <Text style={styles.actionLabel}>Contacts</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Location Map Preview */}
+        {userLocation && (
+          <View style={styles.mapPreview}>
+            <View style={styles.mapHeader}>
+              <Ionicons name="location" size={20} color="#EF4444" />
+              <Text style={styles.mapTitle}>Your Location</Text>
+              {nearbyHospitals.length > 0 && (
+                <Text style={styles.hospitalCount}>
+                  {nearbyHospitals.length} hospital{nearbyHospitals.length !== 1 ? 's' : ''} nearby
+                </Text>
+              )}
+            </View>
+            <View style={styles.mapWrapper}>
+              <CrossPlatformMap
+                initialRegion={{
+                  latitude: userLocation.lat,
+                  longitude: userLocation.lng,
+                  latitudeDelta: 0.05,
+                  longitudeDelta: 0.05,
+                }}
+                markers={[
+                  {
+                    latitude: userLocation.lat,
+                    longitude: userLocation.lng,
+                    title: "You are here",
+                    description: "Your current location",
+                    color: "#EF4444"
+                  },
+                  ...nearbyHospitals.map((hospital, index) => ({
+                    latitude: hospital.location.lat,
+                    longitude: hospital.location.lng,
+                    title: hospital.name,
+                    description: `${hospital.distance?.toFixed(1) || 'N/A'} km away`,
+                    color: "#3B82F6"
+                  }))
+                ]}
+              />
+            </View>
+            {nearbyHospitals.length > 0 && (
+              <View style={styles.mapLegend}>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: "#EF4444" }]} />
+                  <Text style={styles.legendText}>Your Location</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: "#3B82F6" }]} />
+                  <Text style={styles.legendText}>Hospitals</Text>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Info Card - Fills empty space */}
         <View style={styles.infoSection}>
@@ -921,5 +1030,68 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     color: "#059669",
+  },
+  mapPreview: {
+    marginTop: 24,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  mapHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    gap: 8,
+  },
+  mapTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  mapWrapper: {
+    height: 200,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  hospitalCount: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#3B82F6",
+    backgroundColor: "#EFF6FF",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  mapLegend: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 20,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  legendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  legendText: {
+    fontSize: 12,
+    color: "#6B7280",
   },
 });

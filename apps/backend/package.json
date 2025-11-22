@@ -8,7 +8,10 @@
     "dev": "nodemon server.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "seed:hospitals": "node scripts/seed-hospitals.js",
+    "seed:hospitals:force": "cross-env FORCE=true node scripts/seed-hospitals.js",
+    "list:hospitals": "node scripts/list-hospitals.js"
   },
   "keywords": [
     "ambulance",

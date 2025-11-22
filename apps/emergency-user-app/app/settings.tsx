@@ -191,7 +191,7 @@ export default function SettingsScreen() {
             icon="medical"
             title="Medical Profile"
             subtitle="Manage your medical information"
-            onPress={() => router.push("/(tabs)/profile")}
+            onPress={() => router.push("/profile")}
           />
           <SettingRow
             icon="people"

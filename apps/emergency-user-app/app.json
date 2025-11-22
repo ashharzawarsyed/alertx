@@ -16,7 +16,7 @@
       "supportsTablet": true,
       "userInterfaceStyle": "light",
       "config": {
-        "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+        "googleMapsApiKey": ""
       }
     },
     "android": {
@@ -30,7 +30,7 @@
       "predictiveBackGestureEnabled": false,
       "config": {
         "googleMaps": {
-          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+          "apiKey": ""
         }
       }
     },
@@ -40,6 +40,14 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow AlertX to access your location for emergency dispatch.",
+          "locationAlwaysPermission": "Allow AlertX to access your location even when the app is in the background.",
+          "locationWhenInUsePermission": "Allow AlertX to access your location while using the app."
+        }
+      ],
       [
         "expo-splash-screen",
         {

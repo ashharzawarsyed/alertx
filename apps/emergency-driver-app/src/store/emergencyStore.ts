@@ -33,9 +33,17 @@ export const useEmergencyStore = create<EmergencyState>((set) => ({
     set({ activeEmergency: emergency }),
 
   addIncomingEmergency: (emergency) =>
-    set((state) => ({
-      incomingEmergencies: [emergency, ...state.incomingEmergencies],
-    })),
+    set((state) => {
+      // Check if emergency already exists to prevent duplicates
+      const exists = state.incomingEmergencies.some((e) => e._id === emergency._id);
+      if (exists) {
+        console.log('⚠️ Emergency already exists, skipping duplicate:', emergency._id);
+        return state;
+      }
+      return {
+        incomingEmergencies: [emergency, ...state.incomingEmergencies],
+      };
+    }),
 
   removeIncomingEmergency: (emergencyId) =>
     set((state) => ({
