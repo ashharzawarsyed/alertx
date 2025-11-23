@@ -37,6 +37,8 @@ export const AuthProvider = ({ children }) => {
           return;
         }
 
+        console.log("Fetching hospital details for ID:", validHospitalId);
+
         const response = await fetch(
           `${API_BASE_URL}/hospitals/${validHospitalId}`,
           {
@@ -49,22 +51,37 @@ export const AuthProvider = ({ children }) => {
 
         if (response.ok) {
           const data = await response.json();
-          if (data.success) {
-            setHospital(data.data.hospital);
+          console.log("Hospital details response:", data);
+          if (data.success && data.data) {
+            // Handle both nested and flat response structures
+            const hospitalData = data.data.hospital || data.data;
+            setHospital({
+              ...hospitalData,
+              id: hospitalData._id || hospitalData.id || validHospitalId,
+            });
+            console.log("Hospital set successfully:", hospitalData.name);
           }
         } else {
           console.warn(
-            `Hospital API endpoint not found (${response.status}). Using user data as fallback.`
+            `Hospital API endpoint returned ${response.status}. Using basic info.`
           );
-          // Fallback: use hospitalId as the hospital object with basic info
+          // Fallback: use hospitalId with minimal info
           setHospital({
+            _id: validHospitalId,
             id: validHospitalId,
-            name: `Hospital ${validHospitalId}`,
-            // Add other default hospital properties as needed
+            name: "Hospital",
           });
         }
       } catch (error) {
         console.error("Error fetching hospital details:", error);
+        // Set minimal hospital object on error
+        if (hospitalId) {
+          setHospital({
+            _id: hospitalId,
+            id: hospitalId,
+            name: "Hospital",
+          });
+        }
       }
     },
     [API_BASE_URL, token]
@@ -146,13 +163,19 @@ export const AuthProvider = ({ children }) => {
         setUser(data.data.user);
         localStorage.setItem("hospital_token", authToken);
 
+        console.log("Login successful, user data:", data.data.user);
+
         // Fetch hospital details
         const hospitalId = data.data.user.hospitalInfo?.hospitalId;
+        console.log("Hospital ID from user:", hospitalId);
+
         if (hospitalId) {
           await fetchHospitalDetails(hospitalId);
         } else {
-          // If no separate hospital ID, use user data as hospital data for now
+          // If no separate hospital ID, use user data as hospital data
+          console.warn("No hospitalInfo.hospitalId found, using fallback");
           setHospital({
+            _id: data.data.user._id,
             id: data.data.user._id,
             name: data.data.user.name,
             email: data.data.user.email,

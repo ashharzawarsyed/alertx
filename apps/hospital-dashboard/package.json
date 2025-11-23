@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@googlemaps/js-api-loader": "^2.0.2",
+    "@react-google-maps/api": "^2.20.7",
     "@studio-freight/lenis": "^1.0.42",
     "framer-motion": "^12.23.16",
     "gsap": "^3.13.0",
@@ -18,7 +20,9 @@
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-hot-toast": "^2.6.0",
-    "react-router-dom": "^7.9.1"
+    "react-router-dom": "^7.9.1",
+    "recharts": "^3.5.0",
+    "socket.io-client": "^4.8.1"
   },
   "overrides": {
     "react": "19.0.0",

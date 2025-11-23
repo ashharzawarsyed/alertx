@@ -3,7 +3,7 @@ const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:5001/api/v1";
 
 // TEMPORARY: Use mock data while API endpoints are being fixed
-const USE_MOCK_DATA = false;
+const USE_MOCK_DATA = true; // Changed to true to use mock data until backend endpoints are ready
 
 // Block ALL API calls when hospital ID is undefined
 const BLOCK_UNDEFINED_HOSPITAL_CALLS = true;
