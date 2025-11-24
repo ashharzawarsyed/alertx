@@ -697,6 +697,10 @@ export const dispatchIntelligentAmbulance = asyncHandler(async (req, res) => {
     );
 
     const { triageResult, location, symptoms, description, severityLevel, nlpAnalysis } = req.body;
+    
+    console.log('🔍 Validation - triageResult type:', typeof triageResult);
+    console.log('🔍 Validation - triageResult.confidence:', triageResult?.confidence);
+    console.log('🔍 Validation - location:', location);
 
     // Validate required fields
     if (!triageResult || !location) {
@@ -708,8 +712,19 @@ export const dispatchIntelligentAmbulance = asyncHandler(async (req, res) => {
     }
 
     // Ensure triageResult has minimum required structure
-    if (typeof triageResult !== 'object' || triageResult.confidence === undefined) {
+    if (!triageResult || typeof triageResult !== 'object') {
       console.error('❌ Invalid triageResult structure:', triageResult);
+      return sendResponse(
+        res,
+        RESPONSE_CODES.BAD_REQUEST,
+        "Invalid triage result: triageResult must be an object"
+      );
+    }
+    
+    // Validate confidence exists and is a number (can be 0-100 or 0-1)
+    const confidence = triageResult.confidence;
+    if (confidence === undefined || confidence === null) {
+      console.error('❌ Missing confidence value in triageResult');
       return sendResponse(
         res,
         RESPONSE_CODES.BAD_REQUEST,

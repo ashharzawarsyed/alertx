@@ -379,17 +379,18 @@ export default function ExploreScreen() {
               </TouchableOpacity>
             </View>
 
-            {!filteredHospitals || filteredHospitals.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Ionicons name="business-outline" size={64} color="#D1D5DB" />
-                <Text style={styles.emptyTitle}>No hospitals found</Text>
-                <Text style={styles.emptyText}>
-                  {searchQuery
-                    ? "Try adjusting your search"
-                    : "No hospitals found in your area"}
-                </Text>
-              </View>
-            ) : hospitalViewMode === "list" ? (
+            {hospitalViewMode === "list" ? (
+              !filteredHospitals || filteredHospitals.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="business-outline" size={64} color="#D1D5DB" />
+                  <Text style={styles.emptyTitle}>No hospitals found</Text>
+                  <Text style={styles.emptyText}>
+                    {searchQuery
+                      ? "Try adjusting your search"
+                      : "No hospitals found in your area"}
+                  </Text>
+                </View>
+              ) : (
               Array.isArray(filteredHospitals) &&
               filteredHospitals.map((hospital) => (
                 <HospitalCard
@@ -400,13 +401,13 @@ export default function ExploreScreen() {
                   }}
                 />
               ))
-            ) : (
+            )) : (
               <View style={styles.mapWrapper}>
                 {/* Hospital Map */}
                 <CrossPlatformMap
                   initialRegion={{
-                    latitude: userLocation?.latitude || 0,
-                    longitude: userLocation?.longitude || 0,
+                    latitude: userLocation?.latitude || 33.6844,
+                    longitude: userLocation?.longitude || 73.0479,
                     latitudeDelta: 0.05,
                     longitudeDelta: 0.05,
                   }}

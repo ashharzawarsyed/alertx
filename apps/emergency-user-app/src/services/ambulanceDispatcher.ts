@@ -128,11 +128,12 @@ class AmbulanceDispatcher {
       const response = await axios.post(
         `${Config.API_URL}/emergencies/dispatch-intelligent`,
         {
-          ambulanceType,
-          severity: triageResult.severity,
-          emergencyType: triageResult.emergencyType,
-          userLocation,
-          triageAnalysis: triageResult,
+          triageResult: triageResult, // Send as triageResult, not triageAnalysis
+          location: userLocation, // Send as location, not userLocation
+          symptoms: triageResult.detectedSymptoms?.map((s: any) => s.keyword) || [],
+          description: `AI-analyzed: ${triageResult.emergencyType} (${triageResult.severity} severity)`,
+          severityLevel: triageResult.severity,
+          nlpAnalysis: triageResult.nlpInsights,
         },
         {
           headers,

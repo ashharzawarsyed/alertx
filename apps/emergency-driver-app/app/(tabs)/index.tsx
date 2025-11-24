@@ -45,16 +45,28 @@ export default function HomeScreen() {
     requestLocationPermission();
     fetchDriverLocation();
 
+    // Start continuous location tracking
+    const locationInterval = startLocationTracking();
+
     return () => {
       socketService.offNewEmergency();
+      if (locationInterval) clearInterval(locationInterval);
     };
   }, []);
 
   const fetchDriverLocation = async () => {
     try {
+      console.log('📍 Requesting location permissions...');
       const { status } = await Location.requestForegroundPermissionsAsync();
+      
       if (status !== 'granted') {
+        console.warn('⚠️ Location permissions denied, using default Islamabad location');
         setLocationError('Location permission denied');
+        // Use default Islamabad location
+        setDriverLocation({
+          lat: 33.6844,
+          lng: 73.0479,
+        });
         return;
       }
 
@@ -70,7 +82,54 @@ export default function HomeScreen() {
     } catch (error) {
       console.error('Failed to fetch driver location:', error);
       setLocationError('Failed to get location');
+      // Fallback to default Islamabad location on error
+      setDriverLocation({
+        lat: 33.6844,
+        lng: 73.0479,
+      });
     }
+  };
+
+  const startLocationTracking = () => {
+    console.log('🎯 Starting continuous location tracking...');
+    
+    const interval = setInterval(async () => {
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        
+        if (status !== 'granted') {
+          return;
+        }
+
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+
+        const locationData = {
+          lat: location.coords.latitude,
+          lng: location.coords.longitude,
+          accuracy: location.coords.accuracy || 0,
+          speed: location.coords.speed || 0,
+          heading: location.coords.heading || 0,
+        };
+
+        // Update local state
+        setDriverLocation({
+          lat: locationData.lat,
+          lng: locationData.lng,
+        });
+
+        // Emit to socket if connected
+        if (socketService.isConnected()) {
+          socketService.updateLocation(locationData);
+          console.log('📡 Location emitted:', locationData);
+        }
+      } catch (error) {
+        console.error('Location tracking error:', error);
+      }
+    }, 5000); // Update every 5 seconds
+
+    return interval;
   };
 
   const requestLocationPermission = async () => {
@@ -282,44 +341,42 @@ export default function HomeScreen() {
       </View>
 
       {/* Driver Location Map */}
-      {driverLocation && (
-        <View style={styles.mapContainer}>
-          <View style={styles.mapHeader}>
-            <Text style={styles.mapTitle}>📍 Your Location</Text>
-            {incomingEmergencies.length > 0 && (
-              <Text style={styles.emergencyCount}>
-                {incomingEmergencies.length} active request{incomingEmergencies.length !== 1 ? 's' : ''}
-              </Text>
-            )}
-          </View>
-          <View style={styles.mapWrapper}>
-            <CrossPlatformMap
-              initialRegion={{
-                latitude: driverLocation.lat,
-                longitude: driverLocation.lng,
-                latitudeDelta: 0.05,
-                longitudeDelta: 0.05,
-              }}
-              markers={[
-                {
-                  latitude: driverLocation.lat,
-                  longitude: driverLocation.lng,
-                  title: "Your Location",
-                  description: "Driver position",
-                  color: "#10b981"
-                },
-                ...incomingEmergencies.map((emergency, index) => ({
-                  latitude: emergency.location.lat,
-                  longitude: emergency.location.lng,
-                  title: `Emergency ${index + 1}`,
-                  description: emergency.severityLevel,
-                  color: emergency.severityLevel === 'critical' ? '#ef4444' : '#f59e0b'
-                }))
-              ]}
-            />
-          </View>
+      <View style={styles.mapContainer}>
+        <View style={styles.mapHeader}>
+          <Text style={styles.mapTitle}>📍 {driverLocation ? 'Your Location' : 'Default Location (Islamabad)'}</Text>
+          {incomingEmergencies.length > 0 && (
+            <Text style={styles.emergencyCount}>
+              {incomingEmergencies.length} active request{incomingEmergencies.length !== 1 ? 's' : ''}
+            </Text>
+          )}
         </View>
-      )}
+        <View style={styles.mapWrapper}>
+          <CrossPlatformMap
+            initialRegion={{
+              latitude: driverLocation?.lat || 33.6844,
+              longitude: driverLocation?.lng || 73.0479,
+              latitudeDelta: 0.05,
+              longitudeDelta: 0.05,
+            }}
+            markers={[
+              {
+                latitude: driverLocation?.lat || 33.6844,
+                longitude: driverLocation?.lng || 73.0479,
+                title: driverLocation ? "Your Location" : "Default Location",
+                description: driverLocation ? "Driver position" : "Islamabad, Pakistan",
+                color: "#10b981"
+              },
+              ...incomingEmergencies.map((emergency, index) => ({
+                latitude: emergency.location.lat,
+                longitude: emergency.location.lng,
+                title: `Emergency ${index + 1}`,
+                description: emergency.severityLevel,
+                color: emergency.severityLevel === 'critical' ? '#ef4444' : '#f59e0b'
+              }))
+            ]}
+          />
+        </View>
+      </View>
 
       {/* Emergency List */}
       {incomingEmergencies.length === 0 ? (

@@ -654,57 +654,55 @@ export default function HomeScreen() {
         </View>
 
         {/* Location Map Preview */}
-        {userLocation && (
-          <View style={styles.mapPreview}>
-            <View style={styles.mapHeader}>
-              <Ionicons name="location" size={20} color="#EF4444" />
-              <Text style={styles.mapTitle}>Your Location</Text>
-              {nearbyHospitals.length > 0 && (
-                <Text style={styles.hospitalCount}>
-                  {nearbyHospitals.length} hospital{nearbyHospitals.length !== 1 ? 's' : ''} nearby
-                </Text>
-              )}
-            </View>
-            <View style={styles.mapWrapper}>
-              <CrossPlatformMap
-                initialRegion={{
-                  latitude: userLocation.lat,
-                  longitude: userLocation.lng,
-                  latitudeDelta: 0.05,
-                  longitudeDelta: 0.05,
-                }}
-                markers={[
-                  {
-                    latitude: userLocation.lat,
-                    longitude: userLocation.lng,
-                    title: "You are here",
-                    description: "Your current location",
-                    color: "#EF4444"
-                  },
-                  ...nearbyHospitals.map((hospital, index) => ({
-                    latitude: hospital.location.lat,
-                    longitude: hospital.location.lng,
-                    title: hospital.name,
-                    description: `${hospital.distance?.toFixed(1) || 'N/A'} km away`,
-                    color: "#3B82F6"
-                  }))
-                ]}
-              />
-            </View>
+        <View style={styles.mapPreview}>
+          <View style={styles.mapHeader}>
+            <Ionicons name="location" size={20} color="#EF4444" />
+            <Text style={styles.mapTitle}>{userLocation ? 'Your Location' : 'Default Location (Islamabad)'}</Text>
             {nearbyHospitals.length > 0 && (
-              <View style={styles.mapLegend}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: "#EF4444" }]} />
-                  <Text style={styles.legendText}>Your Location</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: "#3B82F6" }]} />
-                  <Text style={styles.legendText}>Hospitals</Text>
-                </View>
-              </View>
+              <Text style={styles.hospitalCount}>
+                {nearbyHospitals.length} hospital{nearbyHospitals.length !== 1 ? 's' : ''} nearby
+              </Text>
             )}
           </View>
-        )}
+          <View style={styles.mapWrapper}>
+            <CrossPlatformMap
+              initialRegion={{
+                latitude: userLocation?.lat || 33.6844,
+                longitude: userLocation?.lng || 73.0479,
+                latitudeDelta: 0.05,
+                longitudeDelta: 0.05,
+              }}
+              markers={[
+                {
+                  latitude: userLocation?.lat || 33.6844,
+                  longitude: userLocation?.lng || 73.0479,
+                  title: userLocation ? "You are here" : "Default Location",
+                  description: userLocation ? "Your current location" : "Islamabad, Pakistan",
+                  color: "#EF4444"
+                },
+                ...nearbyHospitals.map((hospital, index) => ({
+                  latitude: hospital.location.lat,
+                  longitude: hospital.location.lng,
+                  title: hospital.name,
+                  description: `${hospital.distance?.toFixed(1) || 'N/A'} km away`,
+                  color: "#3B82F6"
+                }))
+              ]}
+            />
+          </View>
+          {nearbyHospitals.length > 0 && (
+            <View style={styles.mapLegend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: "#EF4444" }]} />
+                <Text style={styles.legendText}>Your Location</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: "#3B82F6" }]} />
+                <Text style={styles.legendText}>Hospitals</Text>
+              </View>
+            </View>
+          )}
+        </View>
 
         {/* Info Card - Fills empty space */}
         <View style={styles.infoSection}>

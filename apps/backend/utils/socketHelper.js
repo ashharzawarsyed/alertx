@@ -103,15 +103,61 @@ const handleDriverEvents = (socket) => {
   });
 
   // Location update
-  socket.on("driver:updateLocation", (data) => {
-    const { lat, lng, speed, heading } = data;
+  socket.on("driver:updateLocation", async (data) => {
+    const { location, timestamp } = data;
+    const { lat, lng, speed, heading, accuracy } = location;
 
-    // Broadcast to emergency tracking rooms
+    try {
+      // Find active emergency assigned to this driver
+      const Emergency = require("../models/Emergency.js").default;
+      const activeEmergency = await Emergency.findOne({
+        assignedDriver: socket.userId,
+        status: { $in: ["accepted", "in_progress"] },
+      });
+
+      if (activeEmergency) {
+        // Update ambulance location in emergency document
+        activeEmergency.ambulanceLocation = {
+          lat,
+          lng,
+          lastUpdated: new Date(),
+          speed: speed || 0,
+          heading: heading || 0,
+        };
+        await activeEmergency.save();
+
+        // Broadcast to patient app (specific emergency room)
+        io.to(`emergency_${activeEmergency._id}`).emit("ambulance:locationUpdate", {
+          emergencyId: activeEmergency._id.toString(),
+          location: { lat, lng },
+          speed: speed || 0,
+          heading: heading || 0,
+          timestamp: new Date(),
+        });
+
+        // Broadcast to hospital dashboard
+        if (activeEmergency.assignedHospital) {
+          io.to(`hospital_${activeEmergency.assignedHospital}`).emit("ambulance:locationUpdate", {
+            emergencyId: activeEmergency._id.toString(),
+            location: { lat, lng },
+            speed: speed || 0,
+            heading: heading || 0,
+            timestamp: new Date(),
+          });
+        }
+
+        console.log(`📍 Ambulance location updated for emergency ${activeEmergency._id}:`, { lat, lng });
+      }
+    } catch (error) {
+      console.error("Error updating ambulance location:", error);
+    }
+
+    // Also broadcast to general emergency tracking room
     socket.broadcast.to("emergency_tracking").emit("driver:locationUpdate", {
       driverId: socket.userId,
       location: { lat, lng },
-      speed,
-      heading,
+      speed: speed || 0,
+      heading: heading || 0,
       timestamp: new Date(),
     });
   });
@@ -152,6 +198,20 @@ const handlePatientEvents = (socket) => {
     socket.join("emergency_tracking");
   });
 
+  // Join emergency room for tracking
+  socket.on("emergency:join", (data) => {
+    const { emergencyId } = data;
+    console.log(`🚪 Patient joining emergency room: ${emergencyId}`);
+    socket.join(`emergency_${emergencyId}`);
+  });
+
+  // Leave emergency room
+  socket.on("emergency:leave", (data) => {
+    const { emergencyId } = data;
+    console.log(`🚪 Patient leaving emergency room: ${emergencyId}`);
+    socket.leave(`emergency_${emergencyId}`);
+  });
+
   // Patient location update during emergency
   socket.on("patient:updateLocation", (data) => {
     const { emergencyId, lat, lng } = data;
@@ -175,7 +235,15 @@ const handleHospitalEvents = (socket) => {
   // Join hospital-specific room
   socket.on("hospital:join", (data) => {
     const { hospitalId } = data;
+    console.log(`🏥 Hospital staff joining hospital room: ${hospitalId}`);
     socket.join(`hospital_${hospitalId}`);
+  });
+
+  // Leave hospital room
+  socket.on("hospital:leave", (data) => {
+    const { hospitalId } = data;
+    console.log(`🏥 Hospital staff leaving hospital room: ${hospitalId}`);
+    socket.leave(`hospital_${hospitalId}`);
   });
 
   // Bed availability update

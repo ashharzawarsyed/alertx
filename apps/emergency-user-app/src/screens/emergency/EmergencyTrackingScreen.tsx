@@ -17,6 +17,9 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { emergencyService, Emergency } from "../../services/emergencyService";
 import CrossPlatformMap, { Marker } from "../../components/CrossPlatformMap";
 
+// Socket service will be dynamically imported when needed
+let socketService: any = null;
+
 const { width, height } = Dimensions.get("window");
 const ASPECT_RATIO = width / height;
 
@@ -190,13 +193,68 @@ export default function EmergencyTrackingScreen() {
   useEffect(() => {
     fetchEmergencyDetails();
 
-    // Poll for updates every 10 seconds
+    // Setup socket listener for real-time ambulance location
+    setupAmbulanceTracking();
+
+    // Poll for updates every 30 seconds (reduced since we have real-time updates)
     const interval = setInterval(() => {
       fetchEmergencyDetails(false);
-    }, 10000);
+    }, 30000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      cleanupAmbulanceTracking();
+    };
   }, [fetchEmergencyDetails]);
+
+  const setupAmbulanceTracking = async () => {
+    try {
+      // Dynamically import socket service
+      const { default: service } = await import('../../services/socketService');
+      socketService = service;
+
+      // Connect socket if not already connected
+      if (!socketService.isConnected()) {
+        const connected = await socketService.connect();
+        if (!connected) {
+          console.warn('⚠️ Could not connect socket for tracking');
+          return;
+        }
+      }
+
+      // Join emergency room
+      socketService.joinEmergencyRoom(emergencyId);
+
+      // Listen for ambulance location updates
+      socketService.onAmbulanceLocationUpdate((data: any) => {
+        if (data.emergencyId === emergencyId) {
+          console.log('🚑 Ambulance location update received:', data.location);
+          
+          setDriverLocation({
+            latitude: data.location.lat,
+            longitude: data.location.lng,
+          });
+
+          // Recalculate ETA if we have patient location
+          if (emergency?.location) {
+            calculateETA(
+              [data.location.lng, data.location.lat],
+              [emergency.location.lng, emergency.location.lat]
+            );
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error setting up ambulance tracking:', error);
+    }
+  };
+
+  const cleanupAmbulanceTracking = () => {
+    if (socketService && socketService.isConnected()) {
+      socketService.leaveEmergencyRoom(emergencyId);
+      socketService.offAmbulanceLocationUpdate();
+    }
+  };
 
   const handleCancelEmergency = () => {
     Alert.alert(
