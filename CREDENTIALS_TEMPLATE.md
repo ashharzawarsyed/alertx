@@ -16,16 +16,20 @@
 ## 🔑 Critical Credentials (Required)
 
 ### MongoDB Database
+
 ```
 MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/alertx
 ```
+
 **Note:** Your teammate needs this to connect to the database
 
 ### JWT Authentication Secret
+
 ```
 JWT_SECRET=your-super-secret-jwt-key-here
 GLOBAL_JWT_SECRET=your-super-secret-jwt-key-here
 ```
+
 **Note:** Use the SAME secret in both root and backend .env files
 
 ---
@@ -33,6 +37,7 @@ GLOBAL_JWT_SECRET=your-super-secret-jwt-key-here
 ## 📧 Email Service (Optional but Recommended)
 
 ### Gmail Configuration
+
 ```
 EMAIL_USER=your-email@gmail.com
 EMAIL_PASS=your-gmail-app-password
@@ -40,6 +45,7 @@ EMAIL_FROM="AlertX System <your-email@gmail.com>"
 ```
 
 **How to get Gmail App Password:**
+
 1. Go to Google Account Settings
 2. Enable 2-Factor Authentication
 3. Go to App Passwords section
@@ -53,20 +59,26 @@ EMAIL_FROM="AlertX System <your-email@gmail.com>"
 ## 🗺️ Map Services (Optional)
 
 ### Mapbox
+
 ```
 MAPBOX_ACCESS_TOKEN=your-mapbox-token-here
 ```
+
 **Get it from:** https://www.mapbox.com/
+
 - Sign up for free account
 - Go to Access Tokens
 - Copy default public token
 
 ### Google Maps
+
 ```
 GOOGLE_MAPS_API_KEY=your-google-maps-key-here
 GOOGLE_PLACES_API_KEY=your-google-places-key-here
 ```
+
 **Get it from:** https://console.cloud.google.com/
+
 - Create new project
 - Enable Maps JavaScript API
 - Enable Places API
@@ -77,12 +89,15 @@ GOOGLE_PLACES_API_KEY=your-google-places-key-here
 ## ☁️ Cloud Storage (Optional)
 
 ### Cloudinary (for file uploads)
+
 ```
 CLOUDINARY_CLOUD_NAME=your-cloud-name
 CLOUDINARY_API_KEY=your-api-key
 CLOUDINARY_API_SECRET=your-api-secret
 ```
+
 **Get it from:** https://cloudinary.com/
+
 - Sign up for free account
 - Go to Dashboard
 - Copy credentials
@@ -92,12 +107,15 @@ CLOUDINARY_API_SECRET=your-api-secret
 ## 📱 SMS Service (Optional)
 
 ### Twilio
+
 ```
 TWILIO_ACCOUNT_SID=your-account-sid
 TWILIO_AUTH_TOKEN=your-auth-token
 TWILIO_PHONE_NUMBER=your-phone-number
 ```
+
 **Get it from:** https://www.twilio.com/
+
 - Sign up for trial account
 - Get free phone number
 - Copy credentials from Console
@@ -121,12 +139,14 @@ After sharing these credentials, your teammate should:
 ## ⚠️ Security Reminders
 
 ### DO:
+
 - ✅ Use password manager (1Password, LastPass, Bitwarden)
 - ✅ Send via encrypted channel
 - ✅ Rotate credentials if compromised
 - ✅ Use different credentials for production
 
 ### DON'T:
+
 - ❌ Send via email (unencrypted)
 - ❌ Post in Slack/Discord/Teams
 - ❌ Commit to Git
@@ -138,17 +158,20 @@ After sharing these credentials, your teammate should:
 ## 🔄 If Credentials Are Compromised
 
 ### MongoDB:
+
 1. Go to MongoDB Atlas
 2. Change database user password
 3. Update connection string
 4. Redeploy all services
 
 ### JWT Secret:
+
 1. Generate new secret: `openssl rand -base64 32`
 2. Update all .env files
 3. All users will need to login again
 
 ### API Keys:
+
 1. Go to respective service dashboard
 2. Revoke compromised key
 3. Generate new key
@@ -159,6 +182,7 @@ After sharing these credentials, your teammate should:
 ## 📞 Support
 
 If your teammate has issues:
+
 1. Check they copied credentials correctly (no extra spaces)
 2. Verify they created .env files in correct locations
 3. Check MongoDB IP whitelist (add 0.0.0.0/0 for testing)
