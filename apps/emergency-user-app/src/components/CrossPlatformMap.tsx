@@ -23,10 +23,11 @@ export interface CrossPlatformMapProps {
   style?: any;
   onMapReady?: () => void;
   children?: React.ReactNode;
+  customMapScript?: string; // For injecting custom polylines or other map features
 }
 
 const CrossPlatformMap = React.forwardRef<any, CrossPlatformMapProps>(
-  ({ initialRegion, markers = [], style, onMapReady }, ref) => {
+  ({ initialRegion, markers = [], style, onMapReady, customMapScript = '' }, ref) => {
     const [isLoading, setIsLoading] = useState(true);
     
     // Get Google Maps API key from env
@@ -107,6 +108,10 @@ const CrossPlatformMap = React.forwardRef<any, CrossPlatformMapProps>(
         });
         
         console.log('🗺️ Markers added successfully');
+
+        // Execute custom map script (e.g., polylines)
+        ${customMapScript}
+        
         window.ReactNativeWebView?.postMessage('map-loaded');
       } catch (error) {
         console.error('❌ Map initialization error:', error);

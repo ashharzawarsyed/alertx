@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Config from '../config/config';
+import { useAuthStore } from '../store/authStore';
 
 interface AmbulanceLocationUpdate {
   emergencyId: string;
@@ -34,7 +35,8 @@ class SocketService {
         return true;
       }
 
-      const token = await AsyncStorage.getItem('userToken');
+      // Get token from auth store
+      const token = useAuthStore.getState().token;
 
       if (!token) {
         console.error('❌ No auth token for socket connection');

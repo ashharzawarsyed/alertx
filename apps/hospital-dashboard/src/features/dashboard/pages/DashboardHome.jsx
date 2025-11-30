@@ -8,6 +8,7 @@ import {
   FirstAid,
   User,
   Bell,
+  X,
 } from "phosphor-react";
 import React, { useState, useEffect } from "react";
 import toast, { Toaster } from "react-hot-toast";
@@ -15,6 +16,7 @@ import toast, { Toaster } from "react-hot-toast";
 import { AmbulanceCard } from "../../../components/emergency/EmergencyCards";
 import PatientCarouselErrorBoundary from "../../../components/emergency/PatientCarouselErrorBoundary";
 import { PatientNavigationCarousel } from "../../../components/emergency/PatientNavigationCarousel";
+import { HospitalTrackingMap } from "../../../components/tracking/HospitalTrackingMap";
 import { useAuth } from "../../../hooks/useAuth";
 import EmergencyService from "../../../services/EmergencyService";
 
@@ -28,6 +30,14 @@ const DashboardHome = () => {
   const [incomingPatients, setIncomingPatients] = useState([]);
   const [criticalAlerts, setCriticalAlerts] = useState([]);
   const [lastNotificationTime, setLastNotificationTime] = useState(Date.now());
+  
+  // Tracking modal state
+  const [trackingModal, setTrackingModal] = useState({
+    isOpen: false,
+    patient: null,
+    ambulance: null,
+    hospital: null,
+  });
 
   // Update current time every second
   useEffect(() => {
@@ -324,7 +334,42 @@ const DashboardHome = () => {
 
   const handleTrackAmbulance = (ambulance) => {
     console.log("Tracking ambulance:", ambulance.id);
-    // Open tracking interface or map view
+    
+    // Find patient assigned to this ambulance
+    const assignedPatient = incomingPatients.find(
+      p => p.ambulanceId === ambulance.id || 
+           p.id === ambulance.assignedEmergencyId ||
+           p.id === ambulance.assignedEmergency
+    );
+    
+    if (assignedPatient) {
+      setTrackingModal({
+        isOpen: true,
+        patient: assignedPatient,
+        ambulance: ambulance,
+        hospital: hospital,
+      });
+    } else {
+      toast.error("No patient assigned to this ambulance");
+    }
+  };
+
+  const handleViewTracking = (patient, ambulance, hospitalData) => {
+    setTrackingModal({
+      isOpen: true,
+      patient: patient,
+      ambulance: ambulance,
+      hospital: hospitalData || hospital,
+    });
+  };
+
+  const closeTrackingModal = () => {
+    setTrackingModal({
+      isOpen: false,
+      patient: null,
+      ambulance: null,
+      hospital: null,
+    });
   };
 
   console.log("Dashboard state:", {
@@ -563,9 +608,12 @@ const DashboardHome = () => {
           <PatientCarouselErrorBoundary>
             <PatientNavigationCarousel
               patients={incomingPatients}
+              ambulances={ambulances}
+              hospital={hospital}
               onAccept={handleAcceptPatient}
               onPrepare={handlePrepareForPatient}
               onCallParamedic={handleCallParamedic}
+              onViewTracking={handleViewTracking}
               autoAdvanceInterval={null} // Set to 10000 for 10-second auto-advance if desired
             />
           </PatientCarouselErrorBoundary>
@@ -685,6 +733,70 @@ const DashboardHome = () => {
           },
         }}
       />
+
+      {/* Tracking Modal */}
+      {trackingModal.isOpen && trackingModal.patient && trackingModal.ambulance && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col overflow-hidden">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 flex items-center justify-between flex-shrink-0">
+              <div>
+                <h2 className="text-2xl font-bold mb-1">Live Ambulance Tracking</h2>
+                <p className="text-blue-100 text-sm">
+                  Patient: {trackingModal.patient.patientName || trackingModal.patient.name} • 
+                  Ambulance: {trackingModal.ambulance.vehicleNumber || trackingModal.ambulance.id}
+                </p>
+              </div>
+              <button
+                onClick={closeTrackingModal}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                aria-label="Close tracking modal"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Map Container */}
+            <div className="flex-1 p-6 bg-slate-50 overflow-hidden">
+              <HospitalTrackingMap
+                ambulance={trackingModal.ambulance}
+                patient={trackingModal.patient}
+                hospital={trackingModal.hospital}
+                status={
+                  trackingModal.patient.status === 'pickedUp' || trackingModal.patient.pickupTime
+                    ? 'transporting_to_hospital'
+                    : 'en_route_to_patient'
+                }
+                className="h-full w-full"
+              />
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-white border-t border-slate-200 p-4 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="text-sm">
+                  <span className="text-slate-600">Condition:</span>
+                  <span className="ml-2 font-semibold text-slate-900">
+                    {trackingModal.patient.condition || trackingModal.patient.emergencyType}
+                  </span>
+                </div>
+                <div className="text-sm">
+                  <span className="text-slate-600">ETA:</span>
+                  <span className="ml-2 font-semibold text-slate-900">
+                    {trackingModal.patient.eta || trackingModal.patient.estimatedArrival || 'Calculating...'}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={closeTrackingModal}
+                className="px-6 py-2 bg-slate-600 hover:bg-slate-700 text-white font-semibold rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

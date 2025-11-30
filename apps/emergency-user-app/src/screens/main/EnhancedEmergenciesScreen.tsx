@@ -365,10 +365,6 @@ export default function EmergenciesScreen() {
   };
 
   const renderMapView = () => {
-    if (filteredEmergencies.length === 0) {
-      return renderEmptyState();
-    }
-
     const activeEmergencies = filteredEmergencies.filter((e) =>
       ["pending", "accepted", "in_progress"].includes(e.status)
     );
@@ -378,8 +374,10 @@ export default function EmergenciesScreen() {
       (e) => e.location?.lat && e.location?.lng
     );
 
-    let centerLat = 0;
-    let centerLng = 0;
+    // Use user location or default to Islamabad if no emergencies
+    let centerLat = 33.6844; // Default: Islamabad
+    let centerLng = 73.0479;
+    
     if (emergenciesWithLocation.length > 0) {
       centerLat =
         emergenciesWithLocation.reduce(
@@ -391,6 +389,10 @@ export default function EmergenciesScreen() {
           (sum, e) => sum + e.location.lng,
           0
         ) / emergenciesWithLocation.length;
+    } else if (user?.location?.lat && user?.location?.lng) {
+      // Use user's location if available
+      centerLat = user.location.lat;
+      centerLng = user.location.lng;
     }
 
     return (
@@ -398,12 +400,11 @@ export default function EmergenciesScreen() {
         {/* Cross-Platform Map */}
         <CrossPlatformMap
           initialRegion={{
-            latitude: centerLat || 0,
-            longitude: centerLng || 0,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
+            latitude: centerLat,
+            longitude: centerLng,
+            latitudeDelta: 0.1,
+            longitudeDelta: 0.1,
           }}
-          style={styles.map}
         >
           {/* Patient Markers */}
           {emergenciesWithLocation.map((emergency) => (
@@ -446,9 +447,13 @@ export default function EmergenciesScreen() {
 
         {/* Map Overlay Card */}
         <View style={styles.mapOverlay}>
-          <Text style={styles.mapOverlayTitle}>Active Emergencies</Text>
+          <Text style={styles.mapOverlayTitle}>
+            {filteredEmergencies.length === 0 ? "No Emergencies" : "Active Emergencies"}
+          </Text>
           <Text style={styles.mapOverlaySubtitle}>
-            {activeEmergencies.length} active emergency requests
+            {filteredEmergencies.length === 0 
+              ? "Map showing your area" 
+              : `${activeEmergencies.length} active emergency request${activeEmergencies.length !== 1 ? 's' : ''}`}
           </Text>
         </View>
       </View>

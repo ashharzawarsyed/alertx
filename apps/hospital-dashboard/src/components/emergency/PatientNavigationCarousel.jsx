@@ -10,13 +10,26 @@ import { IncomingPatientCard } from "./IncomingPatientCard";
  */
 export const PatientNavigationCarousel = ({
   patients = [],
+  ambulances = [],
+  hospital = null,
   onAccept,
   onPrepare,
   onCallParamedic,
+  onViewTracking,
   autoAdvanceInterval = null,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(0);
+  
+  // Helper to find ambulance for current patient
+  const getCurrentAmbulance = (patient) => {
+    if (!patient || !ambulances) return null;
+    return ambulances.find(
+      amb => amb.id === patient.ambulanceId || 
+             amb.assignedEmergencyId === patient.id ||
+             amb.assignedEmergency === patient.id
+    );
+  };
 
   // Navigation functions - MUST be declared before useEffect hooks that depend on them
   const goToNext = useCallback(() => {
@@ -229,9 +242,12 @@ export const PatientNavigationCarousel = ({
             >
               <IncomingPatientCard
                 patient={currentPatient}
+                ambulance={getCurrentAmbulance(currentPatient)}
+                hospital={hospital}
                 onAccept={onAccept}
                 onPrepare={onPrepare}
                 onCallParamedic={onCallParamedic}
+                onViewTracking={onViewTracking}
                 isFullWidth={true}
               />
             </motion.div>

@@ -242,8 +242,30 @@ export default function HomeScreen() {
             10 // 10km radius
           );
           if (hospitalResponse.success && hospitalResponse.data) {
-            setNearbyHospitals(hospitalResponse.data.slice(0, 5)); // Show max 5 hospitals
-            console.log(`🏥 Found ${hospitalResponse.data.length} nearby hospitals`);
+            // Handle both array and object responses
+            const hospitalsArray = Array.isArray(hospitalResponse.data) 
+              ? hospitalResponse.data 
+              : (hospitalResponse.data as any).hospitals || [];
+            
+            if (hospitalsArray.length > 0) {
+              setNearbyHospitals(hospitalsArray.slice(0, 5)); // Show max 5 hospitals
+              console.log(`🏥 Found ${hospitalsArray.length} nearby hospitals`);
+            } else {
+              // Fallback to Islamabad hospitals if no nearby hospitals found
+              console.log('⚠️ No nearby hospitals, fetching Islamabad defaults...');
+              const islamabadResponse = await exploreService.getNearbyHospitals(
+                33.6844, // Islamabad F-7 center
+                73.0479,
+                50 // 50km radius to cover Islamabad
+              );
+              if (islamabadResponse.success && islamabadResponse.data) {
+                const islamabadHospitals = Array.isArray(islamabadResponse.data)
+                  ? islamabadResponse.data
+                  : (islamabadResponse.data as any).hospitals || [];
+                setNearbyHospitals(islamabadHospitals.slice(0, 5));
+                console.log(`🏥 Showing ${islamabadHospitals.length} Islamabad hospitals as default`);
+              }
+            }
           }
         } catch (error) {
           console.error("❌ Error fetching hospitals:", error);
@@ -334,6 +356,26 @@ export default function HomeScreen() {
                 },
               },
               { text: "OK", style: "cancel" },
+            ]
+          );
+          return;
+        }
+
+        // Handle insufficient permissions (wrong account type)
+        if (response.message?.includes('Insufficient permissions') || response.message?.includes('Authentication required')) {
+          Alert.alert(
+            "Wrong Account Type",
+            "You are using a driver's account to login to the patient app. Please sign out and login with a patient account, or create a new patient account.",
+            [
+              {
+                text: "Sign Out",
+                onPress: () => {
+                  useAuthStore.getState().signOut();
+                  router.replace('/auth/signin');
+                },
+                style: "destructive"
+              },
+              { text: "Cancel", style: "cancel" },
             ]
           );
           return;
