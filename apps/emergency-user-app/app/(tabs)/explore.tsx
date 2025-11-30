@@ -114,10 +114,37 @@ export default function ExploreScreen() {
     try {
       const response = await exploreService.getNearbyHospitals(lat, lng, 50);
       if (response.success && response.data) {
-        setHospitals(response.data);
+        const hospitalsArray = Array.isArray(response.data)
+          ? response.data
+          : (response.data as any).hospitals || [];
+        
+        if (hospitalsArray.length > 0) {
+          setHospitals(hospitalsArray);
+          console.log(`🏥 Found ${hospitalsArray.length} nearby hospitals`);
+        } else {
+          // Fallback to Islamabad hospitals if no nearby hospitals found
+          console.log('⚠️ No nearby hospitals, fetching Islamabad defaults...');
+          const islamabadResponse = await exploreService.getNearbyHospitals(
+            33.6844, // Islamabad F-7 center
+            73.0479,
+            50 // 50km radius to cover Islamabad
+          );
+          if (islamabadResponse.success && islamabadResponse.data) {
+            const islamabadHospitals = Array.isArray(islamabadResponse.data)
+              ? islamabadResponse.data
+              : (islamabadResponse.data as any).hospitals || [];
+            setHospitals(islamabadHospitals);
+            console.log(`🏥 Showing ${islamabadHospitals.length} Islamabad hospitals as default`);
+          } else {
+            setHospitals([]);
+          }
+        }
+      } else {
+        setHospitals([]);
       }
     } catch (error) {
       console.error("Error fetching hospitals:", error);
+      setHospitals([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -403,30 +430,31 @@ export default function ExploreScreen() {
               ))
             )) : (
               <View style={styles.mapWrapper}>
-                {/* Hospital Map */}
+                {/* Hospital Map - Always show with user location */}
                 <CrossPlatformMap
                   initialRegion={{
                     latitude: userLocation?.latitude || 33.6844,
                     longitude: userLocation?.longitude || 73.0479,
-                    latitudeDelta: 0.05,
-                    longitudeDelta: 0.05,
+                    latitudeDelta: 0.1,
+                    longitudeDelta: 0.1,
                   }}
                   style={styles.hospitalMap}
                 >
-                  {/* User Location Marker */}
-                  {userLocation && (
-                    <Marker
-                      coordinate={userLocation}
-                      title="Your Location"
-                      pinColor="#3B82F6"
-                    >
-                      <View style={styles.userMarker}>
-                        <Ionicons name="location" size={20} color="#FFF" />
-                      </View>
-                    </Marker>
-                  )}
+                  {/* User Location Marker - Always show */}
+                  <Marker
+                    coordinate={{
+                      latitude: userLocation?.latitude || 33.6844,
+                      longitude: userLocation?.longitude || 73.0479,
+                    }}
+                    title="Your Location"
+                    pinColor="#3B82F6"
+                  >
+                    <View style={styles.userMarker}>
+                      <Ionicons name="location" size={24} color="#FFF" />
+                    </View>
+                  </Marker>
 
-                  {/* Hospital Markers */}
+                  {/* Hospital Markers - Highlighted with red medical icons */}
                   {Array.isArray(filteredHospitals) && filteredHospitals.map((hospital) => (
                     <Marker
                       key={hospital._id}
@@ -436,10 +464,10 @@ export default function ExploreScreen() {
                       }}
                       title={hospital.name}
                       description={hospital.address}
-                      pinColor="#FF3B30"
+                      pinColor="#DC2626"
                     >
                       <View style={styles.hospitalMarker}>
-                        <Ionicons name="medical" size={20} color="#FFF" />
+                        <Ionicons name="medical" size={24} color="#FFF" />
                       </View>
                     </Marker>
                   ))}
@@ -447,10 +475,10 @@ export default function ExploreScreen() {
 
                 <View style={styles.mapInfoCard}>
                   <Text style={styles.mapInfoTitle}>
-                    {Array.isArray(filteredHospitals) ? filteredHospitals.length : 0} Hospital{(Array.isArray(filteredHospitals) && filteredHospitals.length !== 1) ? "s" : ""} Nearby
+                    {Array.isArray(filteredHospitals) ? filteredHospitals.length : 0} Hospital{(Array.isArray(filteredHospitals) && filteredHospitals.length !== 1) ? "s" : ""} {filteredHospitals.length === 0 ? "Found" : "Nearby"}
                   </Text>
                   <Text style={styles.mapInfoSubtitle}>
-                    Tap markers for details
+                    {filteredHospitals.length > 0 ? "Tap markers for details" : userLocation ? "Showing your location" : "Centered on Islamabad"}
                   </Text>
                 </View>
               </View>
@@ -838,19 +866,19 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   hospitalMarker: {
-    width: 48,
-    height: 48,
-    backgroundColor: "#EF4444",
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    backgroundColor: "#DC2626",
+    borderRadius: 26,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 3,
+    borderWidth: 4,
     borderColor: "#FFF",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowColor: "#DC2626",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 8,
   },
   mapInfoCard: {
     position: "absolute",
