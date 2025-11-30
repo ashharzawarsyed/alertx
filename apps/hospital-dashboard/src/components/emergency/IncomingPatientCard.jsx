@@ -10,26 +10,35 @@ import {
   Bell,
   Activity,
   Calendar,
+  NavigationArrow,
 } from "phosphor-react";
-import React from "react";
+import React, { useState } from "react";
 
 import { PriorityBadge } from "../ui/DashboardComponents";
+import { TrackingPreview } from "../tracking/HospitalTrackingMap";
 
 /**
  * Incoming Patient Card Component - Shows patients en route to hospital
  */
 export const IncomingPatientCard = ({
   patient,
+  ambulance,
+  hospital,
   onAccept,
   onPrepare,
   onCallParamedic,
+  onViewTracking,
   isFullWidth = false,
 }) => {
+  const [showTracking, setShowTracking] = useState(false);
+  
   console.log("IncomingPatientCard received:", {
     patient,
     patientType: typeof patient,
     patientKeys: patient ? Object.keys(patient) : null,
     isFullWidth,
+    hasAmbulance: !!ambulance,
+    hasHospital: !!hospital,
   });
 
   // Safety check for patient data
@@ -58,6 +67,20 @@ export const IncomingPatientCard = ({
     notes = patient.description || "No additional notes",
     ambulanceId = null,
   } = patient || {};
+
+  // Determine tracking status
+  const trackingStatus = patient.status === 'pickedUp' || patient.pickupTime 
+    ? 'transporting_to_hospital' 
+    : 'en_route_to_patient';
+
+  // Handle tracking view
+  const handleViewFullTracking = () => {
+    if (onViewTracking) {
+      onViewTracking(patient, ambulance, hospital);
+    } else {
+      setShowTracking(!showTracking);
+    }
+  };
 
   // Calculate arrival time in minutes if it's an ISO string
   let arrivalMinutes = estimatedArrival;
@@ -316,6 +339,19 @@ export const IncomingPatientCard = ({
             </p>
           )}
         </div>
+
+        {/* Live Tracking Preview */}
+        {ambulance && ambulance.location && (
+          <div className="mb-4">
+            <TrackingPreview
+              ambulance={ambulance}
+              patient={patient}
+              hospital={hospital}
+              status={trackingStatus}
+              onViewFullMap={handleViewFullTracking}
+            />
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className={`flex gap-3`}>
