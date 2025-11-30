@@ -238,7 +238,7 @@ export default function EmergencyTrackingScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [emergencyId, calculateETA, router]);
+  }, [emergencyId, router]);
 
   useEffect(() => {
     fetchEmergencyDetails();

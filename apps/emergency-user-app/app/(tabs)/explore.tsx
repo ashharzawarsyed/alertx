@@ -418,17 +418,18 @@ export default function ExploreScreen() {
                   </Text>
                 </View>
               ) : (
-              Array.isArray(filteredHospitals) &&
-              filteredHospitals.map((hospital) => (
-                <HospitalCard
-                  key={hospital._id}
-                  hospital={hospital}
-                  onPress={() => {
-                    /* Handle hospital details */
-                  }}
-                />
-              ))
-            )) : (
+                Array.isArray(filteredHospitals) &&
+                filteredHospitals.map((hospital) => (
+                  <HospitalCard
+                    key={hospital._id}
+                    hospital={hospital}
+                    onPress={() => {
+                      /* Handle hospital details */
+                    }}
+                  />
+                ))
+              )
+            ) : (
               <View style={styles.mapWrapper}>
                 {/* Hospital Map - Always show with user location */}
                 <CrossPlatformMap
@@ -438,7 +439,6 @@ export default function ExploreScreen() {
                     latitudeDelta: 0.1,
                     longitudeDelta: 0.1,
                   }}
-                  style={styles.hospitalMap}
                 >
                   {/* User Location Marker - Always show */}
                   <Marker

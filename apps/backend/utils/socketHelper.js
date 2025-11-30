@@ -1,5 +1,6 @@
 import { Server } from "socket.io";
 import { verifyToken } from "./jwtHelper.js";
+import Emergency from "../models/Emergency.js";
 
 let io;
 
@@ -109,7 +110,6 @@ const handleDriverEvents = (socket) => {
 
     try {
       // Find active emergency assigned to this driver
-      const Emergency = require("../models/Emergency.js").default;
       const activeEmergency = await Emergency.findOne({
         assignedDriver: socket.userId,
         status: { $in: ["accepted", "in_progress"] },

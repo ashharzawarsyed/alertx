@@ -247,7 +247,15 @@ export const useAmbulanceTracking = (
       remainingDistance,
       traversedDistance,
     });
-  }, [ambulanceLocation, patientLocation, hospitalLocation, status]);
+  }, [
+    ambulanceLocation.lat, 
+    ambulanceLocation.lng, 
+    patientLocation.lat, 
+    patientLocation.lng, 
+    hospitalLocation.lat, 
+    hospitalLocation.lng, 
+    status
+  ]);
 
   return state;
 };
