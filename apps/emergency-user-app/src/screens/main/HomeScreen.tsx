@@ -632,6 +632,7 @@ export default function HomeScreen() {
                   activeEmergency.status === 'cancelled' && styles.cancelledText
                 ]}>
                   Status: {activeEmergency.status.replace("_", " ")} • {activeEmergency.status === 'cancelled' ? 'Tap to dismiss' : 'Tap to track'}
+                  </Text>
                 <Text style={styles.activeEmergencySubtitle}>
                   Status: {activeEmergency.status.replace("_", " ")} • Tap to
                   track
