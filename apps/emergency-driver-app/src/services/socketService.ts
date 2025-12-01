@@ -20,6 +20,7 @@ class SocketService {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private emergencyCallback: ((data: EmergencyNotification) => void) | null = null;
+  private emergencyCancelledCallback: ((data: { emergencyId: string; reason: string; message: string }) => void) | null = null;
 
   /**
    * Connect to Socket.IO server
@@ -110,7 +111,20 @@ class SocketService {
       }
     });
 
-    // Emergency cancelled
+    // Emergency cancelled by patient
+    this.socket.on('emergency:cancelledByPatient', (data: { 
+      emergencyId: string; 
+      reason: string;
+      message: string;
+    }) => {
+      console.log('❌ Emergency cancelled by patient:', data);
+      
+      if (this.emergencyCancelledCallback) {
+        this.emergencyCancelledCallback(data);
+      }
+    });
+
+    // Emergency cancelled (general)
     this.socket.on('emergency:cancelled', (data: { emergencyId: string; reason: string }) => {
       console.log('❌ Emergency cancelled:', data);
     });
@@ -139,6 +153,20 @@ class SocketService {
   }
 
   /**
+   * Listen for emergency cancellations by patient
+   */
+  onEmergencyCancelled(callback: (data: { emergencyId: string; reason: string; message: string }) => void) {
+    this.emergencyCancelledCallback = callback;
+  }
+
+  /**
+   * Remove emergency cancelled listener
+   */
+  offEmergencyCancelled() {
+    this.emergencyCancelledCallback = null;
+  }
+
+  /**
    * Disconnect from socket server
    */
   disconnect() {
@@ -147,6 +175,7 @@ class SocketService {
       this.socket.disconnect();
       this.socket = null;
       this.emergencyCallback = null;
+      this.emergencyCancelledCallback = null;
     }
   }
 

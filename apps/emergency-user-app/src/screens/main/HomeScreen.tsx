@@ -50,6 +50,7 @@ export default function HomeScreen() {
   >([]);
   const [refreshing, setRefreshing] = useState(false);
   const lastCreatedEmergencyId = useRef<string | null>(null);
+  const isDispatching = useRef<boolean>(false); // Prevent duplicate dispatch calls
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [nearbyHospitals, setNearbyHospitals] = useState<any[]>([]);
@@ -100,6 +101,27 @@ export default function HomeScreen() {
         Alert.alert(
           'Emergency Cancelled',
           data.reason || 'Your emergency has been cancelled. You can now request a new emergency.',
+          [{ text: 'OK' }]
+        );
+      }
+    });
+
+    // Listen for emergency being forwarded to another driver
+    socketRef.current.on('emergency:forwarded', (data: { 
+      emergencyId: string;
+      previousDriver: string;
+      newDriver: string;
+      reason: string;
+      message: string;
+    }) => {
+      console.log('🔄 Emergency forwarded:', data);
+      
+      if (activeEmergency?._id === data.emergencyId) {
+        Alert.alert(
+          '🔄 Emergency Forwarded',
+          `Previous driver (${data.previousDriver}) was unavailable.\n\n` +
+          `Your emergency has been forwarded to: ${data.newDriver}\n\n` +
+          `Reason: ${data.reason}`,
           [{ text: 'OK' }]
         );
       }
@@ -298,11 +320,54 @@ export default function HomeScreen() {
 
   // Handle symptom analysis completion
   const handleAnalysisComplete = async (analysis: TriageResult) => {
+    // Prevent duplicate calls
+    if (isDispatching.current) {
+      console.log('⚠️ Already dispatching, ignoring duplicate call');
+      return;
+    }
+
     console.log('🔬 Analysis received:', analysis);
     setTriageResult(analysis);
     setShowSymptomModal(false);
 
+    // Set dispatching flag
+    isDispatching.current = true;
+
     try {
+      // Check for active emergency BEFORE attempting dispatch
+      console.log('🔍 Checking for active emergencies...');
+      const checkResponse = await emergencyService.getEmergencies(1, 50);
+      if (checkResponse.success && checkResponse.data) {
+        const activeEmergencies = checkResponse.data.emergencies.filter(
+          (e: Emergency) => ['pending', 'accepted', 'in_progress'].includes(e.status)
+        );
+        
+        if (activeEmergencies.length > 0) {
+          const activeEmerg = activeEmergencies[0];
+          setActiveEmergency(activeEmerg);
+          console.log('⚠️ Found active emergency:', activeEmerg._id);
+          
+          Alert.alert(
+            "Active Emergency Detected",
+            `You already have an emergency in progress (Status: ${activeEmerg.status}).\n\nPlease wait for the current emergency to be resolved before creating a new one.`,
+            [
+              {
+                text: "Track Current Emergency",
+                onPress: () => {
+                  router.push({
+                    pathname: "/emergency/tracking" as any,
+                    params: { emergencyId: activeEmerg._id },
+                  });
+                },
+              },
+              { text: "OK", style: "cancel" },
+            ]
+          );
+          isDispatching.current = false; // Reset flag
+          return;
+        }
+      }
+
       // Use actual user location or fallback
       const location = userLocation || {
         lat: 33.6522224, // Fallback: Islamabad coordinates
@@ -313,22 +378,14 @@ export default function HomeScreen() {
         console.log("⚠️ Using fallback location - GPS not available");
       }
 
-      // Dispatch ambulance based on AI analysis
-      console.log('🚑 Dispatching ambulance...');
-      const ambulance = await ambulanceDispatcher.dispatchAmbulance(
-        analysis,
-        location
-      );
-
-      setDispatchedAmbulance(ambulance);
-
       // Get actual symptoms from analysis
       const actualSymptoms = analysis.detectedSymptoms?.map((s: any) => s.keyword) || [];
       const symptomsText = actualSymptoms.length > 0 
         ? actualSymptoms.join(', ')
         : `${analysis.emergencyType} emergency`;
 
-      // Trigger emergency in backend with actual symptoms
+      // Dispatch ambulance via backend (this handles everything)
+      console.log('🚑 Dispatching intelligent ambulance...');
       const response = await emergencyService.dispatchIntelligentAmbulance(
         analysis,
         location,
@@ -358,6 +415,7 @@ export default function HomeScreen() {
               { text: "OK", style: "cancel" },
             ]
           );
+          isDispatching.current = false; // Reset flag
           return;
         }
 
@@ -378,11 +436,13 @@ export default function HomeScreen() {
               { text: "Cancel", style: "cancel" },
             ]
           );
+          isDispatching.current = false; // Reset flag
           return;
         }
         
         // Other errors
         Alert.alert('Error', response.message || 'Failed to dispatch ambulance. Please try again.');
+        isDispatching.current = false; // Reset flag
         return;
       }
 
@@ -391,11 +451,17 @@ export default function HomeScreen() {
         // Track this emergency ID to prevent duplicate notifications
         lastCreatedEmergencyId.current = response.data.emergency._id;
         
+        // Store dispatched ambulance info
+        if (response.data.ambulance) {
+          setDispatchedAmbulance(response.data.ambulance);
+        }
+        
         // Show first aid guide
         setShowFirstAidGuide(true);
         
         // Build alert message - driver will be assigned when they accept
         const driverInfo = response.data.ambulance?.driver;
+        const hospitalInfo = response.data.suggestedHospital;
         let alertMessage = `Emergency request sent successfully!\n`;
         
         if (driverInfo) {
@@ -406,7 +472,12 @@ export default function HomeScreen() {
           alertMessage += `\n⏳ Please wait for driver acceptance`;
         }
         
-        alertMessage += `\n\n🏥 Severity: ${analysis.severity}`;
+        if (hospitalInfo) {
+          alertMessage += `\n\n🏥 Nearest Hospital: ${hospitalInfo.name}`;
+          alertMessage += `\n📍 Distance: ${hospitalInfo.distance.toFixed(1)} km`;
+        }
+        
+        alertMessage += `\n\n🚨 Severity: ${analysis.severity}`;
         alertMessage += `\n✅ Confidence: ${Math.round(analysis.confidence)}%`;
         alertMessage += `\n\nYou will be notified when a driver accepts your emergency.`;
 
@@ -423,10 +494,14 @@ export default function HomeScreen() {
             },
           ]
         );
+        
+        // Reset dispatching flag on success
+        isDispatching.current = false;
       }
     } catch (error) {
       console.error('❌ Dispatch failed:', error);
       Alert.alert('Error', 'Failed to dispatch ambulance. Please try again.');
+      isDispatching.current = false; // Reset flag on error
     }
   };
 

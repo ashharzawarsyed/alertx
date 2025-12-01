@@ -1117,20 +1117,22 @@ export const cancelEmergency = asyncHandler(async (req, res) => {
   emergency.cancelledAt = new Date();
   await emergency.save();
 
-  // If driver was assigned, free them up
+  // If driver was assigned, free them up and notify them
   if (emergency.assignedDriver) {
     const driver = await User.findById(emergency.assignedDriver);
     if (driver) {
       driver.driverInfo.status = DRIVER_STATUS.AVAILABLE;
       await driver.save();
 
-      // Notify driver via socket
+      // Notify driver via socket to remove the request
       try {
-        emitToUser(driver._id.toString(), "emergency:cancelled", {
+        emitToUser(driver._id.toString(), "emergency:cancelledByPatient", {
           emergencyId: emergency._id,
           reason: reason || 'Cancelled by patient',
+          message: 'The patient has cancelled this emergency request',
           timestamp: new Date().toISOString(),
         });
+        console.log(`📡 Notified driver ${driver.name} about cancellation`);
       } catch (socketError) {
         console.error("⚠️ Failed to notify driver:", socketError.message);
       }
@@ -1148,5 +1150,158 @@ export const cancelEmergency = asyncHandler(async (req, res) => {
   sendResponse(res, RESPONSE_CODES.SUCCESS, "Emergency cancelled successfully", {
     emergency,
   });
+});
+
+/**
+ * @desc    Driver rejects/declines emergency request
+ * @route   POST /api/v1/emergencies/:id/reject
+ * @access  Private (Driver)
+ */
+export const rejectEmergency = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+
+  const emergency = await Emergency.findById(id);
+
+  if (!emergency) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.NOT_FOUND,
+      "Emergency not found"
+    );
+  }
+
+  // Verify driver is the assigned driver
+  if (req.user.role !== USER_ROLES.DRIVER) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.FORBIDDEN,
+      "Only drivers can reject emergencies"
+    );
+  }
+
+  // Can only reject pending emergencies
+  if (emergency.status !== EMERGENCY_STATUS.PENDING) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.BAD_REQUEST,
+      `Cannot reject emergency with status: ${emergency.status}`
+    );
+  }
+
+  console.log(`🚫 Driver ${req.user.name} rejected emergency ${emergency._id}`);
+  console.log(`   Reason: ${reason || 'Not specified'}`);
+
+  // Remove current driver assignment
+  const previousDriverId = emergency.assignedDriver;
+  emergency.assignedDriver = null;
+
+  // Find next available driver
+  console.log('🔍 Finding next available driver...');
+  
+  const nearestDriver = await User.findOne({
+    role: USER_ROLES.DRIVER,
+    "driverInfo.status": DRIVER_STATUS.AVAILABLE,
+    _id: { $ne: previousDriverId }, // Exclude the driver who just rejected
+  }).sort({ createdAt: 1 });
+
+  if (nearestDriver) {
+    console.log(`✅ Found next driver: ${nearestDriver.name}`);
+    
+    // Assign to new driver
+    emergency.assignedDriver = nearestDriver._id;
+    nearestDriver.driverInfo.status = DRIVER_STATUS.BUSY;
+    await nearestDriver.save();
+    await emergency.save();
+
+    // Notify new driver
+    try {
+      emitToUser(nearestDriver._id.toString(), "emergency:newRequest", {
+        emergencyId: emergency._id,
+        location: emergency.location,
+        severityLevel: emergency.severityLevel,
+        symptoms: emergency.symptoms,
+        description: emergency.description,
+        patient: {
+          name: emergency.patient?.name,
+          phone: emergency.patient?.phone,
+        },
+        forwardedFrom: req.user.name,
+        timestamp: new Date().toISOString(),
+      });
+      console.log(`📡 Notified new driver: ${nearestDriver.name}`);
+    } catch (error) {
+      console.error("⚠️ Failed to notify new driver:", error.message);
+    }
+
+    // Notify patient about forwarding
+    try {
+      await emergency.populate('patient');
+      if (emergency.patient) {
+        emitToUser(emergency.patient._id.toString(), "emergency:forwarded", {
+          emergencyId: emergency._id,
+          previousDriver: req.user.name,
+          newDriver: nearestDriver.name,
+          reason: reason || 'Driver unavailable',
+          message: `Your emergency request has been forwarded to another driver: ${nearestDriver.name}`,
+          timestamp: new Date().toISOString(),
+        });
+        console.log(`📨 Notified patient about forwarding`);
+      }
+    } catch (error) {
+      console.error("⚠️ Failed to notify patient:", error.message);
+    }
+
+    await emergency.populate([
+      { path: "patient", select: "name email phone" },
+      { path: "assignedDriver", select: "name email phone driverInfo" },
+      { path: "assignedHospital", select: "name address phone" },
+    ]);
+
+    return sendResponse(
+      res,
+      RESPONSE_CODES.SUCCESS,
+      "Emergency forwarded to next available driver",
+      {
+        emergency,
+        forwardedTo: {
+          name: nearestDriver.name,
+          phone: nearestDriver.phone,
+        },
+      }
+    );
+  } else {
+    // No other drivers available
+    console.log('❌ No other drivers available');
+    
+    emergency.status = EMERGENCY_STATUS.CANCELLED;
+    emergency.cancelReason = 'No available drivers';
+    emergency.cancelledAt = new Date();
+    await emergency.save();
+
+    // Notify patient
+    try {
+      await emergency.populate('patient');
+      if (emergency.patient) {
+        emitToUser(emergency.patient._id.toString(), "emergency:cancelled", {
+          emergencyId: emergency._id,
+          reason: 'No available drivers could be found',
+          message: 'Unfortunately, no ambulances are available at this moment. Please call local emergency services.',
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (error) {
+      console.error("⚠️ Failed to notify patient:", error.message);
+    }
+
+    return sendResponse(
+      res,
+      RESPONSE_CODES.NOT_FOUND,
+      "No available drivers found. Emergency cancelled.",
+      {
+        emergency,
+      }
+    );
+  }
 });
 

@@ -50,6 +50,7 @@ export default function HomeScreen() {
 
     return () => {
       socketService.offNewEmergency();
+      socketService.offEmergencyCancelled();
       if (locationInterval) clearInterval(locationInterval);
     };
   }, []);
@@ -171,6 +172,18 @@ export default function HomeScreen() {
         [{ text: 'View', onPress: () => {} }]
       );
     });
+
+    // Listen for patient cancellations
+    socketService.onEmergencyCancelled((data) => {
+      console.log('❌ Emergency cancelled by patient:', data);
+      removeIncomingEmergency(data.emergencyId);
+      
+      Alert.alert(
+        'Emergency Cancelled',
+        data.message || 'The patient has cancelled this emergency request.',
+        [{ text: 'OK' }]
+      );
+    });
   };
 
   const handleRefresh = async () => {
@@ -208,6 +221,40 @@ export default function HomeScreen() {
       );
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to accept emergency');
+    }
+  };
+
+  const handleRejectEmergency = async (emergency: Emergency) => {
+    try {
+      Alert.alert(
+        'Decline Emergency',
+        'Are you sure you want to decline this emergency? It will be forwarded to another driver.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Decline',
+            style: 'destructive',
+            onPress: async () => {
+              const result = await emergencyService.rejectEmergency(
+                emergency._id,
+                'Driver unavailable'
+              );
+
+              if (result.success) {
+                removeIncomingEmergency(emergency._id);
+                Alert.alert(
+                  'Emergency Declined',
+                  result.message || 'Emergency forwarded to another driver'
+                );
+              } else {
+                Alert.alert('Error', result.message || 'Failed to decline emergency');
+              }
+            },
+          },
+        ]
+      );
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to decline emergency');
     }
   };
 
@@ -299,12 +346,20 @@ export default function HomeScreen() {
         </View>
       )}
 
-      <TouchableOpacity
-        style={styles.acceptButton}
-        onPress={() => handleAcceptEmergency(item)}
-      >
-        <Text style={styles.acceptButtonText}>Accept Emergency</Text>
-      </TouchableOpacity>
+      <View style={styles.actionButtons}>
+        <TouchableOpacity
+          style={styles.acceptButton}
+          onPress={() => handleAcceptEmergency(item)}
+        >
+          <Text style={styles.acceptButtonText}>Accept</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.declineButton}
+          onPress={() => handleRejectEmergency(item)}
+        >
+          <Text style={styles.declineButtonText}>Decline</Text>
+        </TouchableOpacity>
+      </View>
     </TouchableOpacity>
   );
 
@@ -548,7 +603,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#075985',
   },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
   acceptButton: {
+    flex: 1,
     backgroundColor: '#dc2626',
     paddingVertical: 12,
     borderRadius: 8,
@@ -556,6 +616,18 @@ const styles = StyleSheet.create({
   },
   acceptButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  declineButton: {
+    flex: 1,
+    backgroundColor: '#e5e7eb',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  declineButtonText: {
+    color: '#1f2937',
     fontSize: 16,
     fontWeight: '600',
   },
