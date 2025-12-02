@@ -38,6 +38,7 @@ export default function HomeScreen() {
   );
   const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const locationIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     loadEmergencies();
@@ -45,13 +46,14 @@ export default function HomeScreen() {
     requestLocationPermission();
     fetchDriverLocation();
 
-    // Start continuous location tracking
-    const locationInterval = startLocationTracking();
+    // Start basic location tracking (updates map only, no socket emission)
+    const locationInterval = startBasicLocationTracking();
+    locationIntervalRef.current = locationInterval;
 
     return () => {
       socketService.offNewEmergency();
       socketService.offEmergencyCancelled();
-      if (locationInterval) clearInterval(locationInterval);
+      if (locationIntervalRef.current) clearInterval(locationIntervalRef.current);
     };
   }, []);
 
@@ -91,8 +93,8 @@ export default function HomeScreen() {
     }
   };
 
-  const startLocationTracking = () => {
-    console.log('🎯 Starting continuous location tracking...');
+  const startBasicLocationTracking = () => {
+    console.log('🎯 Starting basic location tracking (map updates only)...');
     
     const interval = setInterval(async () => {
       try {
@@ -106,29 +108,18 @@ export default function HomeScreen() {
           accuracy: Location.Accuracy.Balanced,
         });
 
-        const locationData = {
+        // Update local state for map display
+        setDriverLocation({
           lat: location.coords.latitude,
           lng: location.coords.longitude,
-          accuracy: location.coords.accuracy || 0,
-          speed: location.coords.speed || 0,
-          heading: location.coords.heading || 0,
-        };
-
-        // Update local state
-        setDriverLocation({
-          lat: locationData.lat,
-          lng: locationData.lng,
         });
 
-        // Emit to socket if connected
-        if (socketService.isConnected()) {
-          socketService.updateLocation(locationData);
-          console.log('📡 Location emitted:', locationData);
-        }
+        // Note: Location is NOT emitted to socket here
+        // Only emit when there's an active emergency (see active-emergency.tsx)
       } catch (error) {
         console.error('Location tracking error:', error);
       }
-    }, 5000); // Update every 5 seconds
+    }, 10000); // Update every 10 seconds (less frequent since no socket emission)
 
     return interval;
   };
@@ -211,6 +202,7 @@ export default function HomeScreen() {
                 socketService.notifyEmergencyAccepted(emergency._id);
 
                 // Navigate to active emergency screen
+                // Note: Continuous location emission to socket starts in active-emergency.tsx
                 router.push('/active-emergency');
               } else {
                 Alert.alert('Error', result.message || 'Failed to accept emergency');

@@ -451,17 +451,12 @@ export default function HomeScreen() {
         // Track this emergency ID to prevent duplicate notifications
         lastCreatedEmergencyId.current = response.data.emergency._id;
         
-        // Store dispatched ambulance info
-        if (response.data.ambulance) {
-          setDispatchedAmbulance(response.data.ambulance);
-        }
-        
         // Show first aid guide
         setShowFirstAidGuide(true);
         
         // Build alert message - driver will be assigned when they accept
         const driverInfo = response.data.ambulance?.driver;
-        const hospitalInfo = response.data.suggestedHospital;
+        const hospitalInfo = response.data.emergency.assignedHospital;
         let alertMessage = `Emergency request sent successfully!\n`;
         
         if (driverInfo) {
@@ -474,7 +469,7 @@ export default function HomeScreen() {
         
         if (hospitalInfo) {
           alertMessage += `\n\n🏥 Nearest Hospital: ${hospitalInfo.name}`;
-          alertMessage += `\n📍 Distance: ${hospitalInfo.distance.toFixed(1)} km`;
+          alertMessage += `\n📍 Address: ${hospitalInfo.address}`;
         }
         
         alertMessage += `\n\n🚨 Severity: ${analysis.severity}`;
