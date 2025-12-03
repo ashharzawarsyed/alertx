@@ -175,7 +175,9 @@ const DashboardHome = () => {
             <div className="absolute inset-0 border-4 border-blue-500/30 rounded-full"></div>
             <div className="absolute inset-0 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
           </div>
-          <p className="text-gray-300 text-lg font-medium">Loading dashboard...</p>
+          <p className="text-gray-300 text-lg font-medium">
+            Loading dashboard...
+          </p>
         </div>
       </div>
     );
@@ -199,7 +201,7 @@ const DashboardHome = () => {
               </h2>
               <p className="text-gray-400">{error}</p>
             </div>
-            
+
             <div className="flex gap-3 mb-6">
               <button
                 onClick={() => window.location.reload()}
@@ -224,7 +226,9 @@ const DashboardHome = () => {
               </p>
               <ul className="text-xs text-blue-200/80 space-y-1.5">
                 <li>• Make sure backend server is running on port 5001</li>
-                <li>• Check if you're logged in with a valid hospital account</li>
+                <li>
+                  • Check if you're logged in with a valid hospital account
+                </li>
                 <li>• Verify your hospital profile is approved</li>
               </ul>
             </div>
@@ -254,26 +258,34 @@ const DashboardHome = () => {
             {hospitalData?.name || "Hospital Dashboard"}
           </h1>
           <p className="text-gray-400 mt-2 flex items-center gap-2">
-            <span className="text-blue-400 font-semibold">{hospitalData?.type || "General Hospital"}</span>
+            <span className="text-blue-400 font-semibold">
+              {hospitalData?.type || "General Hospital"}
+            </span>
             <span className="text-gray-600">•</span>
-            <span>{new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}</span>
+            <span>
+              {new Date().toLocaleDateString("en-US", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </span>
           </p>
         </div>
-        <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl backdrop-blur-xl border transition-all ${
-          socketService.isConnected
-            ? "bg-green-500/10 border-green-500/30 text-green-400"
-            : "bg-red-500/10 border-red-500/30 text-red-400"
-        }`}>
-          <div className={`w-2.5 h-2.5 rounded-full ${
+        <div
+          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl backdrop-blur-xl border transition-all ${
             socketService.isConnected
-              ? "bg-green-400 shadow-lg shadow-green-400/50 animate-pulse"
-              : "bg-red-400"
-          }`}></div>
+              ? "bg-green-500/10 border-green-500/30 text-green-400"
+              : "bg-red-500/10 border-red-500/30 text-red-400"
+          }`}
+        >
+          <div
+            className={`w-2.5 h-2.5 rounded-full ${
+              socketService.isConnected
+                ? "bg-green-400 shadow-lg shadow-green-400/50 animate-pulse"
+                : "bg-red-400"
+            }`}
+          ></div>
           <span className="text-sm font-bold uppercase tracking-wider">
             {socketService.isConnected ? "Live" : "Offline"}
           </span>
@@ -388,7 +400,11 @@ const DashboardHome = () => {
           <div className="relative bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/50 shadow-xl hover:shadow-2xl hover:shadow-orange-500/10 transition-all">
             <div className="flex items-center justify-between mb-4">
               <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/30">
-                <CheckCircle size={28} className="text-white" weight="duotone" />
+                <CheckCircle
+                  size={28}
+                  className="text-white"
+                  weight="duotone"
+                />
               </div>
               <TrendUp size={24} className="text-orange-400" weight="bold" />
             </div>
@@ -420,7 +436,9 @@ const DashboardHome = () => {
                 <Bed weight="duotone" className="text-indigo-400" />
                 Bed Capacity Status
               </h2>
-              <p className="text-gray-400 text-sm mt-1">Real-time bed availability across all departments</p>
+              <p className="text-gray-400 text-sm mt-1">
+                Real-time bed availability across all departments
+              </p>
             </div>
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -444,13 +462,21 @@ const DashboardHome = () => {
                     {hospitalData?.totalBeds?.general || 0} available
                   </p>
                 </div>
-                <div className={`text-3xl font-bold ${
-                  getBedUtilization("general") >= 90 ? "text-red-400" :
-                  getBedUtilization("general") >= 70 ? "text-orange-400" : "text-green-400"
-                } bg-gray-800/50 px-3 py-2 rounded-xl border ${
-                  getBedUtilization("general") >= 90 ? "border-red-500/30" :
-                  getBedUtilization("general") >= 70 ? "border-orange-500/30" : "border-green-500/30"
-                }`}>
+                <div
+                  className={`text-3xl font-bold ${
+                    getBedUtilization("general") >= 90
+                      ? "text-red-400"
+                      : getBedUtilization("general") >= 70
+                        ? "text-orange-400"
+                        : "text-green-400"
+                  } bg-gray-800/50 px-3 py-2 rounded-xl border ${
+                    getBedUtilization("general") >= 90
+                      ? "border-red-500/30"
+                      : getBedUtilization("general") >= 70
+                        ? "border-orange-500/30"
+                        : "border-green-500/30"
+                  }`}
+                >
                   {getBedUtilization("general")}%
                 </div>
               </div>
@@ -460,12 +486,17 @@ const DashboardHome = () => {
                   animate={{ width: `${getBedUtilization("general")}%` }}
                   transition={{ duration: 1, delay: 0.6 }}
                   className={`h-full ${
-                    getBedUtilization("general") >= 90 ? "bg-gradient-to-r from-red-500 to-red-600" :
-                    getBedUtilization("general") >= 70 ? "bg-gradient-to-r from-orange-500 to-orange-600" :
-                    "bg-gradient-to-r from-green-500 to-green-600"
+                    getBedUtilization("general") >= 90
+                      ? "bg-gradient-to-r from-red-500 to-red-600"
+                      : getBedUtilization("general") >= 70
+                        ? "bg-gradient-to-r from-orange-500 to-orange-600"
+                        : "bg-gradient-to-r from-green-500 to-green-600"
                   } shadow-lg ${
-                    getBedUtilization("general") >= 90 ? "shadow-red-500/50" :
-                    getBedUtilization("general") >= 70 ? "shadow-orange-500/50" : "shadow-green-500/50"
+                    getBedUtilization("general") >= 90
+                      ? "shadow-red-500/50"
+                      : getBedUtilization("general") >= 70
+                        ? "shadow-orange-500/50"
+                        : "shadow-green-500/50"
                   }`}
                 ></motion.div>
               </div>
@@ -481,13 +512,21 @@ const DashboardHome = () => {
                     {hospitalData?.totalBeds?.icu || 0} available
                   </p>
                 </div>
-                <div className={`text-3xl font-bold ${
-                  getBedUtilization("icu") >= 90 ? "text-red-400" :
-                  getBedUtilization("icu") >= 70 ? "text-orange-400" : "text-green-400"
-                } bg-gray-800/50 px-3 py-2 rounded-xl border ${
-                  getBedUtilization("icu") >= 90 ? "border-red-500/30" :
-                  getBedUtilization("icu") >= 70 ? "border-orange-500/30" : "border-green-500/30"
-                }`}>
+                <div
+                  className={`text-3xl font-bold ${
+                    getBedUtilization("icu") >= 90
+                      ? "text-red-400"
+                      : getBedUtilization("icu") >= 70
+                        ? "text-orange-400"
+                        : "text-green-400"
+                  } bg-gray-800/50 px-3 py-2 rounded-xl border ${
+                    getBedUtilization("icu") >= 90
+                      ? "border-red-500/30"
+                      : getBedUtilization("icu") >= 70
+                        ? "border-orange-500/30"
+                        : "border-green-500/30"
+                  }`}
+                >
                   {getBedUtilization("icu")}%
                 </div>
               </div>
@@ -497,12 +536,17 @@ const DashboardHome = () => {
                   animate={{ width: `${getBedUtilization("icu")}%` }}
                   transition={{ duration: 1, delay: 0.7 }}
                   className={`h-full ${
-                    getBedUtilization("icu") >= 90 ? "bg-gradient-to-r from-red-500 to-red-600" :
-                    getBedUtilization("icu") >= 70 ? "bg-gradient-to-r from-orange-500 to-orange-600" :
-                    "bg-gradient-to-r from-green-500 to-green-600"
+                    getBedUtilization("icu") >= 90
+                      ? "bg-gradient-to-r from-red-500 to-red-600"
+                      : getBedUtilization("icu") >= 70
+                        ? "bg-gradient-to-r from-orange-500 to-orange-600"
+                        : "bg-gradient-to-r from-green-500 to-green-600"
                   } shadow-lg ${
-                    getBedUtilization("icu") >= 90 ? "shadow-red-500/50" :
-                    getBedUtilization("icu") >= 70 ? "shadow-orange-500/50" : "shadow-green-500/50"
+                    getBedUtilization("icu") >= 90
+                      ? "shadow-red-500/50"
+                      : getBedUtilization("icu") >= 70
+                        ? "shadow-orange-500/50"
+                        : "shadow-green-500/50"
                   }`}
                 ></motion.div>
               </div>
@@ -512,19 +556,29 @@ const DashboardHome = () => {
             <div className="p-4 bg-gray-700/30 rounded-xl border border-gray-600/30 hover:border-red-500/30 transition-all">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h3 className="font-bold text-white text-lg">Emergency Beds</h3>
+                  <h3 className="font-bold text-white text-lg">
+                    Emergency Beds
+                  </h3>
                   <p className="text-sm text-gray-400 mt-0.5">
                     {hospitalData?.availableBeds?.emergency || 0} of{" "}
                     {hospitalData?.totalBeds?.emergency || 0} available
                   </p>
                 </div>
-                <div className={`text-3xl font-bold ${
-                  getBedUtilization("emergency") >= 90 ? "text-red-400" :
-                  getBedUtilization("emergency") >= 70 ? "text-orange-400" : "text-green-400"
-                } bg-gray-800/50 px-3 py-2 rounded-xl border ${
-                  getBedUtilization("emergency") >= 90 ? "border-red-500/30" :
-                  getBedUtilization("emergency") >= 70 ? "border-orange-500/30" : "border-green-500/30"
-                }`}>
+                <div
+                  className={`text-3xl font-bold ${
+                    getBedUtilization("emergency") >= 90
+                      ? "text-red-400"
+                      : getBedUtilization("emergency") >= 70
+                        ? "text-orange-400"
+                        : "text-green-400"
+                  } bg-gray-800/50 px-3 py-2 rounded-xl border ${
+                    getBedUtilization("emergency") >= 90
+                      ? "border-red-500/30"
+                      : getBedUtilization("emergency") >= 70
+                        ? "border-orange-500/30"
+                        : "border-green-500/30"
+                  }`}
+                >
                   {getBedUtilization("emergency")}%
                 </div>
               </div>
@@ -534,12 +588,17 @@ const DashboardHome = () => {
                   animate={{ width: `${getBedUtilization("emergency")}%` }}
                   transition={{ duration: 1, delay: 0.8 }}
                   className={`h-full ${
-                    getBedUtilization("emergency") >= 90 ? "bg-gradient-to-r from-red-500 to-red-600" :
-                    getBedUtilization("emergency") >= 70 ? "bg-gradient-to-r from-orange-500 to-orange-600" :
-                    "bg-gradient-to-r from-green-500 to-green-600"
+                    getBedUtilization("emergency") >= 90
+                      ? "bg-gradient-to-r from-red-500 to-red-600"
+                      : getBedUtilization("emergency") >= 70
+                        ? "bg-gradient-to-r from-orange-500 to-orange-600"
+                        : "bg-gradient-to-r from-green-500 to-green-600"
                   } shadow-lg ${
-                    getBedUtilization("emergency") >= 90 ? "shadow-red-500/50" :
-                    getBedUtilization("emergency") >= 70 ? "shadow-orange-500/50" : "shadow-green-500/50"
+                    getBedUtilization("emergency") >= 90
+                      ? "shadow-red-500/50"
+                      : getBedUtilization("emergency") >= 70
+                        ? "shadow-orange-500/50"
+                        : "shadow-green-500/50"
                   }`}
                 ></motion.div>
               </div>
@@ -549,19 +608,29 @@ const DashboardHome = () => {
             <div className="p-4 bg-gray-700/30 rounded-xl border border-gray-600/30 hover:border-pink-500/30 transition-all">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h3 className="font-bold text-white text-lg">Operation Theater</h3>
+                  <h3 className="font-bold text-white text-lg">
+                    Operation Theater
+                  </h3>
                   <p className="text-sm text-gray-400 mt-0.5">
                     {hospitalData?.availableBeds?.operation || 0} of{" "}
                     {hospitalData?.totalBeds?.operation || 0} available
                   </p>
                 </div>
-                <div className={`text-3xl font-bold ${
-                  getBedUtilization("operation") >= 90 ? "text-red-400" :
-                  getBedUtilization("operation") >= 70 ? "text-orange-400" : "text-green-400"
-                } bg-gray-800/50 px-3 py-2 rounded-xl border ${
-                  getBedUtilization("operation") >= 90 ? "border-red-500/30" :
-                  getBedUtilization("operation") >= 70 ? "border-orange-500/30" : "border-green-500/30"
-                }`}>
+                <div
+                  className={`text-3xl font-bold ${
+                    getBedUtilization("operation") >= 90
+                      ? "text-red-400"
+                      : getBedUtilization("operation") >= 70
+                        ? "text-orange-400"
+                        : "text-green-400"
+                  } bg-gray-800/50 px-3 py-2 rounded-xl border ${
+                    getBedUtilization("operation") >= 90
+                      ? "border-red-500/30"
+                      : getBedUtilization("operation") >= 70
+                        ? "border-orange-500/30"
+                        : "border-green-500/30"
+                  }`}
+                >
                   {getBedUtilization("operation")}%
                 </div>
               </div>
@@ -571,12 +640,17 @@ const DashboardHome = () => {
                   animate={{ width: `${getBedUtilization("operation")}%` }}
                   transition={{ duration: 1, delay: 0.9 }}
                   className={`h-full ${
-                    getBedUtilization("operation") >= 90 ? "bg-gradient-to-r from-red-500 to-red-600" :
-                    getBedUtilization("operation") >= 70 ? "bg-gradient-to-r from-orange-500 to-orange-600" :
-                    "bg-gradient-to-r from-green-500 to-green-600"
+                    getBedUtilization("operation") >= 90
+                      ? "bg-gradient-to-r from-red-500 to-red-600"
+                      : getBedUtilization("operation") >= 70
+                        ? "bg-gradient-to-r from-orange-500 to-orange-600"
+                        : "bg-gradient-to-r from-green-500 to-green-600"
                   } shadow-lg ${
-                    getBedUtilization("operation") >= 90 ? "shadow-red-500/50" :
-                    getBedUtilization("operation") >= 70 ? "shadow-orange-500/50" : "shadow-green-500/50"
+                    getBedUtilization("operation") >= 90
+                      ? "shadow-red-500/50"
+                      : getBedUtilization("operation") >= 70
+                        ? "shadow-orange-500/50"
+                        : "shadow-green-500/50"
                   }`}
                 ></motion.div>
               </div>
@@ -624,9 +698,15 @@ const DashboardHome = () => {
               {admittedPatients.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="w-20 h-20 mx-auto mb-4 bg-gray-800/50 rounded-2xl flex items-center justify-center border border-gray-700/30">
-                    <Heartbeat weight="duotone" size={40} className="text-gray-600" />
+                    <Heartbeat
+                      weight="duotone"
+                      size={40}
+                      className="text-gray-600"
+                    />
                   </div>
-                  <p className="text-gray-500 font-medium">No recent patient activity</p>
+                  <p className="text-gray-500 font-medium">
+                    No recent patient activity
+                  </p>
                 </div>
               ) : (
                 admittedPatients.slice(0, 4).map((patient, index) => (
@@ -638,7 +718,11 @@ const DashboardHome = () => {
                     className="flex items-start gap-3 p-4 bg-purple-500/10 rounded-xl border border-purple-500/20 hover:border-purple-500/40 transition-all"
                   >
                     <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <Users weight="duotone" className="text-purple-400" size={20} />
+                      <Users
+                        weight="duotone"
+                        className="text-purple-400"
+                        size={20}
+                      />
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-white">
@@ -709,7 +793,9 @@ const DashboardHome = () => {
               <motion.button
                 whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => (window.location.href = "/dashboard/emergencies")}
+                onClick={() =>
+                  (window.location.href = "/dashboard/emergencies")
+                }
                 className="group/btn relative overflow-hidden flex flex-col items-center justify-center p-6 bg-gradient-to-br from-red-500/20 to-orange-500/20 hover:from-red-500/30 hover:to-orange-500/30 rounded-2xl border border-red-500/30 hover:border-red-400/50 transition-all"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-red-500/0 to-orange-500/0 group-hover/btn:from-red-500/10 group-hover/btn:to-orange-500/10 transition-all"></div>

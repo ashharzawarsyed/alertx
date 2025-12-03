@@ -5,6 +5,7 @@
 ### Hospital Dashboard - Frontend
 
 #### Map Component
+
 - [ ] Create `src/features/dashboard/pages/LiveTracking.jsx`
   - [ ] Google Maps integration with `@react-google-maps/api`
   - [ ] Dark theme map styles
@@ -15,6 +16,7 @@
   - [ ] Map controls (zoom, pan, fullscreen)
 
 #### Ambulance Info Sidebar
+
 - [ ] Create `src/components/AmbulanceInfoPanel.jsx`
   - [ ] Slide-in animation from right
   - [ ] Vehicle number and status badge
@@ -31,6 +33,7 @@
   - [ ] Glassmorphic dark theme design
 
 #### Statistics Overlay
+
 - [ ] Create statistics cards overlay
   - [ ] Total ambulances count
   - [ ] En route count
@@ -40,6 +43,7 @@
   - [ ] Real-time updates
 
 #### Tracking Service
+
 - [ ] Create `src/services/trackingService.js`
   - [ ] Socket.IO connection setup
   - [ ] Hospital room joining
@@ -52,6 +56,7 @@
   - [ ] Mark arrived method
 
 #### Custom Markers
+
 - [ ] Create `src/components/AmbulanceMarker.jsx`
   - [ ] Rotating ambulance icon based on heading
   - [ ] Color coding by status
@@ -60,6 +65,7 @@
   - [ ] Click handler for info panel
 
 #### Route Display
+
 - [ ] Polyline component for routes
   - [ ] Dotted line style
   - [ ] Color by status
@@ -68,6 +74,7 @@
 ### Backend - API Endpoints
 
 #### Ambulance Tracking
+
 - [ ] `GET /api/v1/hospitals/:id/ambulances/tracking`
   - [ ] Get hospital's own ambulances
   - [ ] Get incoming ambulances to hospital
@@ -99,6 +106,7 @@
   - [ ] Update bed availability
 
 #### Database Schema
+
 - [ ] Update Ambulance model
   - [ ] Add `currentLocation` with GeoJSON Point
   - [ ] Add `heading` (Number, degrees)
@@ -117,6 +125,7 @@
   - [ ] Add `assignedBed`
 
 #### Socket.IO Events
+
 - [ ] Implement ambulance location broadcast
   - [ ] Listen for driver location updates
   - [ ] Broadcast to hospital room
@@ -139,6 +148,7 @@
   - [ ] Include patient for admission
 
 ### Testing Priority 1
+
 - [ ] Map loads correctly
 - [ ] Hospital marker appears at correct location
 - [ ] Ambulance markers display
@@ -160,6 +170,7 @@
 ### Hospital Dashboard - Emergency Queue Updates
 
 #### Enhanced Accept Modal
+
 - [ ] Update `src/features/dashboard/pages/EmergencyQueue.jsx`
   - [ ] Add ambulance selection section
   - [ ] Fetch available ambulances
@@ -174,6 +185,7 @@
   - [ ] Combined bed + ambulance assignment
 
 #### Emergency Card Enhancement
+
 - [ ] Add ambulance info section (after acceptance)
   - [ ] Ambulance vehicle number
   - [ ] Driver name and photo
@@ -185,6 +197,7 @@
   - [ ] Crew information tooltip
 
 #### Real-time Updates
+
 - [ ] Socket.IO listeners for emergency
   - [ ] Ambulance assigned event
   - [ ] Location update event
@@ -193,6 +206,7 @@
   - [ ] Update emergency card UI
 
 #### Navigation Integration
+
 - [ ] "Track on Map" button
   - [ ] Navigate to Live Tracking page
   - [ ] Focus map on specific ambulance
@@ -201,6 +215,7 @@
 ### Backend - Emergency-Ambulance Integration
 
 #### New Endpoints
+
 - [ ] `POST /api/v1/emergencies/:id/assign-ambulance`
   - [ ] Validate ambulance availability
   - [ ] Assign ambulance to emergency
@@ -227,6 +242,7 @@
   - [ ] Return list with ETAs
 
 #### Emergency-Ambulance Service
+
 - [ ] Create `services/emergencyAmbulanceService.js`
   - [ ] `assignAmbulance(emergencyId, ambulanceId, bedType)`
   - [ ] `getAvailableAmbulances(hospitalId, location)`
@@ -235,6 +251,7 @@
   - [ ] `unassignAmbulance(emergencyId)`
 
 #### Socket.IO Events
+
 - [ ] Emergency ambulance assignment
   - [ ] Emit to hospital: `emergency:ambulance_dispatched`
   - [ ] Emit to driver: `emergency:assigned`
@@ -246,6 +263,7 @@
   - [ ] Include updated ETA
 
 ### Testing Priority 2
+
 - [ ] Accept modal shows available ambulances
 - [ ] Ambulances sorted by distance
 - [ ] Can assign ambulance to emergency
@@ -264,6 +282,7 @@
 ### Emergency User App Updates
 
 #### Emergency Tracking Screen
+
 - [ ] Update `src/screens/EmergencyTrackingScreen.tsx`
   - [ ] Add Socket.IO connection
   - [ ] Listen for ambulance assignment
@@ -275,6 +294,7 @@
   - [ ] Display ETA countdown
 
 #### Ambulance Info Display
+
 - [ ] Add ambulance information card
   - [ ] Vehicle number
   - [ ] Driver name and photo
@@ -285,6 +305,7 @@
   - [ ] Call hospital button
 
 #### Map Markers
+
 - [ ] Patient location marker (red)
 - [ ] Ambulance location marker (blue, updating)
 - [ ] Hospital location marker (purple)
@@ -293,6 +314,7 @@
 ### Emergency Driver App Updates
 
 #### Enhanced Location Tracking
+
 - [ ] Update `src/services/locationService.ts`
   - [ ] Use `watchPosition` with 5-second interval
   - [ ] Extract latitude, longitude
@@ -302,6 +324,7 @@
   - [ ] Emit via Socket.IO
 
 #### Status Management
+
 - [ ] Create status update flow
   - [ ] Dispatched (on accept)
   - [ ] En Route (start navigation)
@@ -311,6 +334,7 @@
   - [ ] Emit Socket.IO event for each status
 
 #### Crew Management
+
 - [ ] Create `src/screens/CrewManagementScreen.tsx`
   - [ ] Add crew member form
   - [ ] Current crew list
@@ -318,6 +342,7 @@
   - [ ] Send crew data with emergency acceptance
 
 #### Active Emergency Screen
+
 - [ ] Update `src/screens/ActiveEmergencyScreen.tsx`
   - [ ] Show patient information
   - [ ] Show destination hospital
@@ -330,6 +355,7 @@
 ### Backend - Orchestration Service
 
 #### Emergency Orchestration Service
+
 - [ ] Create `services/emergencyOrchestrationService.js`
 
 - [ ] Step 1: User creates emergency
@@ -369,6 +395,7 @@
   - [ ] Emit to all parties: completion
 
 #### Data Sync Service
+
 - [ ] Create `services/dataSyncService.js`
   - [ ] Sync bed availability across apps
   - [ ] Sync emergency status everywhere
@@ -377,6 +404,7 @@
   - [ ] Queue updates during offline
 
 #### Google Maps Service
+
 - [ ] Create `services/googleMapsService.js`
   - [ ] Calculate route between two points
   - [ ] Get directions
@@ -388,6 +416,7 @@
 ### Testing Priority 3
 
 #### User App Testing
+
 - [ ] User creates emergency
 - [ ] Receives hospital acceptance notification
 - [ ] Sees ambulance details
@@ -400,6 +429,7 @@
 - [ ] Sees bed assignment
 
 #### Driver App Testing
+
 - [ ] Receives emergency notification
 - [ ] Sees patient details
 - [ ] Sees route to patient
@@ -410,6 +440,7 @@
 - [ ] Arrival updates all apps
 
 #### Hospital Dashboard Testing
+
 - [ ] Receives emergency request
 - [ ] Can assign ambulance
 - [ ] Sees incoming ambulance on map
@@ -420,6 +451,7 @@
 - [ ] Bed count updates
 
 #### End-to-End Testing
+
 - [ ] User → Emergency → Hospitals notified
 - [ ] Hospital → Accept → User notified
 - [ ] Hospital → Assign Ambulance → Driver notified
@@ -435,20 +467,24 @@
 ## 📦 **DEPENDENCIES CHECKLIST**
 
 ### Hospital Dashboard
+
 - [ ] `npm install @react-google-maps/api`
 - [ ] `npm install @googlemaps/js-api-loader`
 - [ ] Verify `socket.io-client` is installed
 
 ### Backend
+
 - [ ] `npm install @googlemaps/google-maps-services-js`
 - [ ] `npm install geolib`
 - [ ] Verify `socket.io` is installed
 
 ### User App
+
 - [ ] Verify `socket.io-client` is installed
 - [ ] Verify Google Maps configured in `app.json`
 
 ### Driver App
+
 - [ ] Verify `@react-native-community/geolocation` is installed
 - [ ] Verify background location permissions
 - [ ] Verify `socket.io-client` is installed
@@ -458,7 +494,9 @@
 ## 🔧 **CONFIGURATION CHECKLIST**
 
 ### Environment Variables
+
 - [ ] Hospital Dashboard `.env`:
+
   ```
   REACT_APP_API_URL=http://localhost:5001
   REACT_APP_SOCKET_URL=http://localhost:5001
@@ -466,29 +504,33 @@
   ```
 
 - [ ] Backend `.env`:
+
   ```
   GOOGLE_MAPS_API_KEY=AIzaSyCgEmYHXUzysg6yRptadI6kv1BnXaNAIPI
   ```
 
 - [ ] User App `Config.ts`:
+
   ```typescript
-  API_URL: "http://192.168.100.23:5001"
-  GOOGLE_MAPS_KEY: "AIzaSyCgEmYHXUzysg6yRptadI6kv1BnXaNAIPI"
+  API_URL: "http://192.168.100.23:5001";
+  GOOGLE_MAPS_KEY: "AIzaSyCgEmYHXUzysg6yRptadI6kv1BnXaNAIPI";
   ```
 
 - [ ] Driver App `Config.ts`:
   ```typescript
-  API_URL: "http://192.168.100.23:5001"
-  LOCATION_UPDATE_INTERVAL: 5000
+  API_URL: "http://192.168.100.23:5001";
+  LOCATION_UPDATE_INTERVAL: 5000;
   ```
 
 ### Database
+
 - [ ] Create geospatial index on ambulances
 - [ ] Update Ambulance schema
 - [ ] Update Emergency schema
 - [ ] Test geospatial queries
 
 ### Google Maps API
+
 - [ ] Enable Maps JavaScript API
 - [ ] Enable Directions API
 - [ ] Enable Distance Matrix API (optional)
@@ -500,27 +542,30 @@
 ## 🎯 **SUCCESS CRITERIA**
 
 ### Priority 1 Success
+
 ✅ Map displays with ambulances in real-time  
 ✅ Clicking ambulance shows detailed info  
 ✅ ETA updates every 5 seconds  
 ✅ Socket.IO connection stable  
-✅ Smooth marker animations  
+✅ Smooth marker animations
 
 ### Priority 2 Success
+
 ✅ Hospital can assign ambulance to emergency  
 ✅ Emergency card shows ambulance tracking  
 ✅ Real-time ETA in emergency queue  
 ✅ "Track on Map" navigation works  
-✅ Status changes sync immediately  
+✅ Status changes sync immediately
 
 ### Priority 3 Success
+
 ✅ User sees ambulance after hospital accepts  
 ✅ Driver receives emergency assignment  
 ✅ Location updates in all 3 apps  
 ✅ Status syncs across all apps  
 ✅ Emergency completes when ambulance arrives  
 ✅ Bed availability updates correctly  
-✅ No stale data anywhere  
+✅ No stale data anywhere
 
 ---
 

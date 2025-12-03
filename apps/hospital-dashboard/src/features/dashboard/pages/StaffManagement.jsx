@@ -413,7 +413,11 @@ const StaffManagement = () => {
                 </p>
               </div>
               <div className="p-4 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-xl border border-green-500/30">
-                <CheckCircle size={28} className="text-green-400" weight="fill" />
+                <CheckCircle
+                  size={28}
+                  className="text-green-400"
+                  weight="fill"
+                />
               </div>
             </div>
           </div>
@@ -437,7 +441,11 @@ const StaffManagement = () => {
                 </p>
               </div>
               <div className="p-4 bg-gradient-to-br from-orange-500/20 to-amber-500/20 rounded-xl border border-orange-500/30">
-                <CalendarBlank size={28} className="text-orange-400" weight="fill" />
+                <CalendarBlank
+                  size={28}
+                  className="text-orange-400"
+                  weight="fill"
+                />
               </div>
             </div>
           </div>
@@ -519,7 +527,11 @@ const StaffManagement = () => {
               className="px-4 py-3 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             >
               {departments.map((dept) => (
-                <option key={dept.value} value={dept.value} className="bg-gray-800">
+                <option
+                  key={dept.value}
+                  value={dept.value}
+                  className="bg-gray-800"
+                >
                   {dept.label}
                 </option>
               ))}
@@ -532,7 +544,11 @@ const StaffManagement = () => {
               className="px-4 py-3 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             >
               {roles.map((role) => (
-                <option key={role.value} value={role.value} className="bg-gray-800">
+                <option
+                  key={role.value}
+                  value={role.value}
+                  className="bg-gray-800"
+                >
                   {role.label}
                 </option>
               ))}
@@ -545,7 +561,11 @@ const StaffManagement = () => {
               className="px-4 py-3 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             >
               {statuses.map((status) => (
-                <option key={status.value} value={status.value} className="bg-gray-800">
+                <option
+                  key={status.value}
+                  value={status.value}
+                  className="bg-gray-800"
+                >
                   {status.label}
                 </option>
               ))}
@@ -570,11 +590,15 @@ const StaffManagement = () => {
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-4">
-                    <div className={`p-4 rounded-xl bg-gradient-to-br ${getRoleColor(staff.role)} border`}>
+                    <div
+                      className={`p-4 rounded-xl bg-gradient-to-br ${getRoleColor(staff.role)} border`}
+                    >
                       <RoleIcon size={28} weight="fill" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold text-white">{staff.name}</h3>
+                      <h3 className="text-xl font-bold text-white">
+                        {staff.name}
+                      </h3>
                       <p className="text-sm text-gray-400 font-medium capitalize">
                         {staff.role} • {staff.department}
                       </p>
@@ -610,8 +634,8 @@ const StaffManagement = () => {
                     {staff.status === "active"
                       ? "Active"
                       : staff.status === "on-leave"
-                      ? "On Leave"
-                      : "Inactive"}
+                        ? "On Leave"
+                        : "Inactive"}
                   </span>
                 </div>
 
@@ -666,8 +690,12 @@ const StaffManagement = () => {
                 {/* Footer */}
                 <div className="mt-4 pt-4 border-t border-gray-700/50">
                   <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>Joined {new Date(staff.joiningDate).toLocaleDateString()}</span>
-                    <span className="text-blue-400">Last active: {staff.lastActive}</span>
+                    <span>
+                      Joined {new Date(staff.joiningDate).toLocaleDateString()}
+                    </span>
+                    <span className="text-blue-400">
+                      Last active: {staff.lastActive}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -681,8 +709,14 @@ const StaffManagement = () => {
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-800/20 to-gray-900/20 rounded-2xl blur-xl"></div>
           <div className="relative bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-xl p-12 rounded-2xl border border-gray-700/50 shadow-xl text-center">
-            <Users size={64} className="mx-auto text-gray-600 mb-4" weight="duotone" />
-            <h3 className="text-xl font-bold text-white mb-2">No Staff Found</h3>
+            <Users
+              size={64}
+              className="mx-auto text-gray-600 mb-4"
+              weight="duotone"
+            />
+            <h3 className="text-xl font-bold text-white mb-2">
+              No Staff Found
+            </h3>
             <p className="text-gray-400">
               Try adjusting your filters or add a new staff member
             </p>
@@ -703,7 +737,9 @@ const StaffManagement = () => {
               <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl blur-xl"></div>
               <div className="relative bg-gradient-to-br from-gray-800/95 to-gray-900/95 backdrop-blur-xl rounded-2xl border border-gray-700/50 shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-white">Add Staff Member</h2>
+                  <h2 className="text-2xl font-bold text-white">
+                    Add Staff Member
+                  </h2>
                   <button
                     onClick={() => {
                       setShowAddModal(false);
@@ -711,7 +747,11 @@ const StaffManagement = () => {
                     }}
                     className="p-2 hover:bg-gray-700/50 rounded-lg"
                   >
-                    <XCircle size={24} className="text-gray-400" weight="fill" />
+                    <XCircle
+                      size={24}
+                      className="text-gray-400"
+                      weight="fill"
+                    />
                   </button>
                 </div>
 
@@ -787,11 +827,21 @@ const StaffManagement = () => {
                       }
                       className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                     >
-                      <option value="doctor" className="bg-gray-800">Doctor</option>
-                      <option value="nurse" className="bg-gray-800">Nurse</option>
-                      <option value="paramedic" className="bg-gray-800">Paramedic</option>
-                      <option value="technician" className="bg-gray-800">Technician</option>
-                      <option value="admin" className="bg-gray-800">Admin</option>
+                      <option value="doctor" className="bg-gray-800">
+                        Doctor
+                      </option>
+                      <option value="nurse" className="bg-gray-800">
+                        Nurse
+                      </option>
+                      <option value="paramedic" className="bg-gray-800">
+                        Paramedic
+                      </option>
+                      <option value="technician" className="bg-gray-800">
+                        Technician
+                      </option>
+                      <option value="admin" className="bg-gray-800">
+                        Admin
+                      </option>
                     </select>
                   </div>
 
@@ -806,11 +856,21 @@ const StaffManagement = () => {
                       }
                       className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                     >
-                      <option value="emergency" className="bg-gray-800">Emergency</option>
-                      <option value="icu" className="bg-gray-800">ICU</option>
-                      <option value="surgery" className="bg-gray-800">Surgery</option>
-                      <option value="radiology" className="bg-gray-800">Radiology</option>
-                      <option value="administration" className="bg-gray-800">Administration</option>
+                      <option value="emergency" className="bg-gray-800">
+                        Emergency
+                      </option>
+                      <option value="icu" className="bg-gray-800">
+                        ICU
+                      </option>
+                      <option value="surgery" className="bg-gray-800">
+                        Surgery
+                      </option>
+                      <option value="radiology" className="bg-gray-800">
+                        Radiology
+                      </option>
+                      <option value="administration" className="bg-gray-800">
+                        Administration
+                      </option>
                     </select>
                   </div>
 
@@ -822,7 +882,10 @@ const StaffManagement = () => {
                       type="text"
                       value={formData.qualification}
                       onChange={(e) =>
-                        setFormData({ ...formData, qualification: e.target.value })
+                        setFormData({
+                          ...formData,
+                          qualification: e.target.value,
+                        })
                       }
                       className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                       placeholder="MD, Emergency Medicine"
@@ -856,7 +919,11 @@ const StaffManagement = () => {
                       className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                     >
                       {shifts.map((shift) => (
-                        <option key={shift.value} value={shift.value} className="bg-gray-800">
+                        <option
+                          key={shift.value}
+                          value={shift.value}
+                          className="bg-gray-800"
+                        >
                           {shift.label}
                         </option>
                       ))}
@@ -874,9 +941,15 @@ const StaffManagement = () => {
                       }
                       className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                     >
-                      <option value="active" className="bg-gray-800">Active</option>
-                      <option value="on-leave" className="bg-gray-800">On Leave</option>
-                      <option value="inactive" className="bg-gray-800">Inactive</option>
+                      <option value="active" className="bg-gray-800">
+                        Active
+                      </option>
+                      <option value="on-leave" className="bg-gray-800">
+                        On Leave
+                      </option>
+                      <option value="inactive" className="bg-gray-800">
+                        Inactive
+                      </option>
                     </select>
                   </div>
                 </div>
@@ -917,7 +990,9 @@ const StaffManagement = () => {
               <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-2xl blur-xl"></div>
               <div className="relative bg-gradient-to-br from-gray-800/95 to-gray-900/95 backdrop-blur-xl rounded-2xl border border-gray-700/50 shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-white">Edit Staff Member</h2>
+                  <h2 className="text-2xl font-bold text-white">
+                    Edit Staff Member
+                  </h2>
                   <button
                     onClick={() => {
                       setShowEditModal(false);
@@ -926,7 +1001,11 @@ const StaffManagement = () => {
                     }}
                     className="p-2 hover:bg-gray-700/50 rounded-lg"
                   >
-                    <XCircle size={24} className="text-gray-400" weight="fill" />
+                    <XCircle
+                      size={24}
+                      className="text-gray-400"
+                      weight="fill"
+                    />
                   </button>
                 </div>
 
@@ -998,11 +1077,21 @@ const StaffManagement = () => {
                       }
                       className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                     >
-                      <option value="doctor" className="bg-gray-800">Doctor</option>
-                      <option value="nurse" className="bg-gray-800">Nurse</option>
-                      <option value="paramedic" className="bg-gray-800">Paramedic</option>
-                      <option value="technician" className="bg-gray-800">Technician</option>
-                      <option value="admin" className="bg-gray-800">Admin</option>
+                      <option value="doctor" className="bg-gray-800">
+                        Doctor
+                      </option>
+                      <option value="nurse" className="bg-gray-800">
+                        Nurse
+                      </option>
+                      <option value="paramedic" className="bg-gray-800">
+                        Paramedic
+                      </option>
+                      <option value="technician" className="bg-gray-800">
+                        Technician
+                      </option>
+                      <option value="admin" className="bg-gray-800">
+                        Admin
+                      </option>
                     </select>
                   </div>
 
@@ -1017,11 +1106,21 @@ const StaffManagement = () => {
                       }
                       className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                     >
-                      <option value="emergency" className="bg-gray-800">Emergency</option>
-                      <option value="icu" className="bg-gray-800">ICU</option>
-                      <option value="surgery" className="bg-gray-800">Surgery</option>
-                      <option value="radiology" className="bg-gray-800">Radiology</option>
-                      <option value="administration" className="bg-gray-800">Administration</option>
+                      <option value="emergency" className="bg-gray-800">
+                        Emergency
+                      </option>
+                      <option value="icu" className="bg-gray-800">
+                        ICU
+                      </option>
+                      <option value="surgery" className="bg-gray-800">
+                        Surgery
+                      </option>
+                      <option value="radiology" className="bg-gray-800">
+                        Radiology
+                      </option>
+                      <option value="administration" className="bg-gray-800">
+                        Administration
+                      </option>
                     </select>
                   </div>
 
@@ -1033,7 +1132,10 @@ const StaffManagement = () => {
                       type="text"
                       value={formData.qualification}
                       onChange={(e) =>
-                        setFormData({ ...formData, qualification: e.target.value })
+                        setFormData({
+                          ...formData,
+                          qualification: e.target.value,
+                        })
                       }
                       className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                     />
@@ -1065,7 +1167,11 @@ const StaffManagement = () => {
                       className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                     >
                       {shifts.map((shift) => (
-                        <option key={shift.value} value={shift.value} className="bg-gray-800">
+                        <option
+                          key={shift.value}
+                          value={shift.value}
+                          className="bg-gray-800"
+                        >
                           {shift.label}
                         </option>
                       ))}
@@ -1083,9 +1189,15 @@ const StaffManagement = () => {
                       }
                       className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                     >
-                      <option value="active" className="bg-gray-800">Active</option>
-                      <option value="on-leave" className="bg-gray-800">On Leave</option>
-                      <option value="inactive" className="bg-gray-800">Inactive</option>
+                      <option value="active" className="bg-gray-800">
+                        Active
+                      </option>
+                      <option value="on-leave" className="bg-gray-800">
+                        On Leave
+                      </option>
+                      <option value="inactive" className="bg-gray-800">
+                        Inactive
+                      </option>
                     </select>
                   </div>
                 </div>

@@ -6,7 +6,9 @@ import { NavigationArrow, Truck, Activity } from "phosphor-react";
 import AmbulanceInfoPanel from "../components/AmbulanceInfoPanel";
 import trackingService from "../services/trackingService";
 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyCgEmYHXUzysg6yRptadI6kv1BnXaNAIPI";
+const GOOGLE_MAPS_API_KEY =
+  import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
+  "AIzaSyCgEmYHXUzysg6yRptadI6kv1BnXaNAIPI";
 
 const libraries = ["places", "geometry"];
 
@@ -17,9 +19,9 @@ const mapContainerStyle = {
 
 // Dark theme map styles
 const darkMapStyles = [
-  { elementType: 'geometry', stylers: [{ color: '#242f3e' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#242f3e' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] },
+  { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
   {
     featureType: "administrative.locality",
     elementType: "labels.text.fill",
@@ -107,7 +109,7 @@ const LiveTracking = () => {
   const [hospital, setHospital] = useState(null);
   const [selectedAmbulance, setSelectedAmbulance] = useState(null);
   const [showInfoPanel, setShowInfoPanel] = useState(false);
-  const [mapCenter, setMapCenter] = useState({ lat: 40.7128, lng: -74.0060 });
+  const [mapCenter, setMapCenter] = useState({ lat: 40.7128, lng: -74.006 });
   const [mapZoom, setMapZoom] = useState(12);
   const [statistics, setStatistics] = useState({
     total: 0,
@@ -116,7 +118,7 @@ const LiveTracking = () => {
     critical: 0,
   });
   const [connectionStatus, setConnectionStatus] = useState("disconnected");
-  
+
   const mapRef = useRef(null);
 
   const onMapLoad = useCallback((map) => {
@@ -129,7 +131,7 @@ const LiveTracking = () => {
       try {
         const hospitalData = JSON.parse(localStorage.getItem("hospital_data"));
         const token = localStorage.getItem("hospital_token");
-        
+
         if (!hospitalData || !token) {
           console.error("No hospital data found");
           return;
@@ -138,7 +140,7 @@ const LiveTracking = () => {
         setHospital(hospitalData);
         setMapCenter({
           lat: hospitalData.coordinates?.latitude || 40.7128,
-          lng: hospitalData.coordinates?.longitude || -74.0060,
+          lng: hospitalData.coordinates?.longitude || -74.006,
         });
 
         // Connect to tracking service
@@ -151,20 +153,20 @@ const LiveTracking = () => {
           ...(data.ownAmbulances || []),
           ...(data.incomingAmbulances || []),
         ];
-        
+
         setAmbulances(allAmbulances);
         updateStatistics(allAmbulances);
 
         // Auto-fit bounds to show all ambulances
         if (allAmbulances.length > 0 && mapRef.current) {
           const bounds = new window.google.maps.LatLngBounds();
-          
+
           // Add hospital to bounds
           bounds.extend({
             lat: hospitalData.coordinates?.latitude,
             lng: hospitalData.coordinates?.longitude,
           });
-          
+
           // Add all ambulances to bounds
           allAmbulances.forEach((amb) => {
             if (amb.currentLocation) {
@@ -174,7 +176,7 @@ const LiveTracking = () => {
               });
             }
           });
-          
+
           mapRef.current.fitBounds(bounds);
         }
 
@@ -224,13 +226,12 @@ const LiveTracking = () => {
             updateStatistics(updated);
             return updated;
           });
-          
+
           if (selectedAmbulance?._id === data.ambulanceId) {
             setShowInfoPanel(false);
             setSelectedAmbulance(null);
           }
         });
-
       } catch (error) {
         console.error("Error initializing tracking:", error);
         setConnectionStatus("error");
@@ -250,9 +251,13 @@ const LiveTracking = () => {
   const updateStatistics = (ambulanceList) => {
     const stats = {
       total: ambulanceList.length,
-      enRoute: ambulanceList.filter((a) => a.status === "en-route" || a.status === "responding").length,
+      enRoute: ambulanceList.filter(
+        (a) => a.status === "en-route" || a.status === "responding"
+      ).length,
       available: ambulanceList.filter((a) => a.status === "available").length,
-      critical: ambulanceList.filter((a) => a.currentEmergency?.priority === "critical").length,
+      critical: ambulanceList.filter(
+        (a) => a.currentEmergency?.priority === "critical"
+      ).length,
     };
     setStatistics(stats);
   };
@@ -315,7 +320,11 @@ const LiveTracking = () => {
             className="bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-xl rounded-xl p-4 border border-blue-500/30 pointer-events-auto"
           >
             <div className="flex items-center justify-between mb-2">
-              <NavigationArrow size={24} weight="duotone" className="text-blue-400" />
+              <NavigationArrow
+                size={24}
+                weight="duotone"
+                className="text-blue-400"
+              />
               <div className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
                 {statistics.enRoute}
               </div>
@@ -357,15 +366,21 @@ const LiveTracking = () => {
 
       {/* Connection Status */}
       <div className="absolute top-6 right-6 z-10">
-        <div className={`px-4 py-2 rounded-full backdrop-blur-xl border ${
-          connectionStatus === "connected" 
-            ? "bg-green-500/20 border-green-500/30 text-green-400" 
-            : "bg-red-500/20 border-red-500/30 text-red-400"
-        }`}>
+        <div
+          className={`px-4 py-2 rounded-full backdrop-blur-xl border ${
+            connectionStatus === "connected"
+              ? "bg-green-500/20 border-green-500/30 text-green-400"
+              : "bg-red-500/20 border-red-500/30 text-red-400"
+          }`}
+        >
           <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${
-              connectionStatus === "connected" ? "bg-green-400 animate-pulse" : "bg-red-400"
-            }`}></div>
+            <div
+              className={`w-2 h-2 rounded-full ${
+                connectionStatus === "connected"
+                  ? "bg-green-400 animate-pulse"
+                  : "bg-red-400"
+              }`}
+            ></div>
             <span className="text-sm font-medium">
               {connectionStatus === "connected" ? "Live" : "Disconnected"}
             </span>
@@ -412,10 +427,10 @@ const LiveTracking = () => {
         {/* Ambulance Markers */}
         {ambulances.map((ambulance) => {
           if (!ambulance.currentLocation) return null;
-          
+
           const isOwn = ambulance.hospitalId === hospital?._id;
           const color = isOwn ? "#3b82f6" : "#10b981";
-          
+
           return (
             <Marker
               key={ambulance._id}

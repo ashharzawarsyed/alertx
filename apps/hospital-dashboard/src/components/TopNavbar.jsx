@@ -1,6 +1,15 @@
-import { motion } from "framer-motion";
-import { Bell, MagnifyingGlass, User, Gear, SignOut } from "phosphor-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Bell,
+  MagnifyingGlass,
+  User,
+  Gear,
+  SignOut,
+  UserCircle,
+  CaretDown,
+} from "phosphor-react";
 import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../hooks/useAuth";
 
@@ -34,13 +43,28 @@ const formatHospitalName = (name) => {
 
 const NavigationBar = () => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [notifications] = useState(3); // Sample notification count
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef(null);
 
   const handleLogout = () => {
+    console.log("Logout clicked");
+    setShowUserMenu(false);
     logout();
+  };
+
+  const handleProfile = () => {
+    console.log("Profile clicked");
+    setShowUserMenu(false);
+    navigate("/dashboard/profile");
+  };
+
+  const toggleUserMenu = (e) => {
+    e.stopPropagation();
+    console.log("Toggle clicked, current state:", showUserMenu);
+    setShowUserMenu(!showUserMenu);
   };
 
   // Close user menu when clicking outside
@@ -64,10 +88,11 @@ const NavigationBar = () => {
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
-      className="sticky top-0 z-40 w-full"
+      className="sticky top-0 z-50 w-full bg-white"
     >
       {/* Navigation Bar Container - Simplified for internal layout */}
       <div className="px-6 py-4 border-b border-slate-100/60">
+        `
         <div className="relative flex items-center justify-between">
           {/* Left Section - Hospital Info */}
           <div className="flex items-center gap-4">
@@ -196,13 +221,12 @@ const NavigationBar = () => {
 
             {/* Hospital Profile */}
             <div className="relative" ref={userMenuRef}>
-              <motion.div
-                whileHover={{ scale: 1.02 }}
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-2 px-2 py-1.5 bg-slate-50/50 hover:bg-slate-100/50 rounded-lg border border-slate-200/60 cursor-pointer transition-all duration-200"
+              <button
+                onClick={toggleUserMenu}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-50/50 hover:bg-slate-100/50 rounded-lg border border-slate-200/60 cursor-pointer transition-all duration-200"
               >
-                <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-sm">
-                  <User size={14} className="text-white" weight="duotone" />
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-sm">
+                  <User size={16} className="text-white" weight="duotone" />
                 </div>
                 <div className="text-left">
                   <p className="text-sm font-medium text-slate-700">
@@ -210,32 +234,84 @@ const NavigationBar = () => {
                   </p>
                   <p className="text-xs text-slate-500">Hospital Admin</p>
                 </div>
-              </motion.div>
+                <CaretDown
+                  size={16}
+                  className={`text-slate-500 transition-transform duration-200 ${showUserMenu ? "rotate-180" : ""}`}
+                  weight="bold"
+                />
+              </button>
 
               {/* User Menu Dropdown */}
-              {showUserMenu && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl border border-slate-200 shadow-xl py-2 z-[9999] overflow-hidden"
-                >
-                  <div className="px-4 py-2 border-b border-slate-100">
-                    <p className="text-sm font-medium text-slate-800">
-                      {formatHospitalName(user?.name)} Hospital
-                    </p>
-                    <p className="text-xs text-slate-500 truncate">
-                      {user?.email}
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleLogout}
-                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+              <AnimatePresence>
+                {showUserMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl border border-slate-200 shadow-2xl overflow-hidden"
+                    style={{ zIndex: 99999 }}
                   >
-                    <SignOut size={16} />
-                    Sign Out
-                  </button>
-                </motion.div>
-              )}
+                    {/* User Info Header */}
+                    <div className="px-4 py-3 bg-gradient-to-br from-blue-50 to-slate-50 border-b border-slate-200">
+                      <p className="text-sm font-semibold text-slate-800 truncate">
+                        {formatHospitalName(user?.name)} Hospital
+                      </p>
+                      <p className="text-xs text-slate-500 truncate mt-0.5">
+                        {user?.email}
+                      </p>
+                    </div>
+
+                    {/* Menu Items */}
+                    <div className="py-1">
+                      <button
+                        onClick={handleProfile}
+                        className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-blue-50 transition-colors flex items-center gap-3 group"
+                      >
+                        <UserCircle
+                          size={18}
+                          weight="duotone"
+                          className="text-slate-500 group-hover:text-blue-600 transition-colors"
+                        />
+                        <span className="font-medium">Hospital Profile</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          navigate("/dashboard");
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-blue-50 transition-colors flex items-center gap-3 group"
+                      >
+                        <Gear
+                          size={18}
+                          weight="duotone"
+                          className="text-slate-500 group-hover:text-blue-600 transition-colors"
+                        />
+                        <span className="font-medium">Settings</span>
+                      </button>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="border-t border-slate-200"></div>
+
+                    {/* Logout Button */}
+                    <div className="py-1">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-3 group"
+                      >
+                        <SignOut
+                          size={18}
+                          weight="duotone"
+                          className="text-red-500 group-hover:text-red-700 transition-colors"
+                        />
+                        <span className="font-semibold">Sign Out</span>
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </div>

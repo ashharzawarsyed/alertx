@@ -205,7 +205,9 @@ const BedManagement = () => {
             <div className="absolute inset-0 border-4 border-blue-500/30 rounded-full"></div>
             <div className="absolute inset-0 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
           </div>
-          <p className="text-gray-300 text-lg font-medium">Loading bed management...</p>
+          <p className="text-gray-300 text-lg font-medium">
+            Loading bed management...
+          </p>
         </div>
       </div>
     );
@@ -235,7 +237,11 @@ const BedManagement = () => {
               <Warning size={24} weight="bold" className="flex-shrink-0" />
             )}
             {toast.type === "info" && (
-              <ArrowsClockwise size={24} weight="bold" className="flex-shrink-0" />
+              <ArrowsClockwise
+                size={24}
+                weight="bold"
+                className="flex-shrink-0"
+              />
             )}
             <span className="font-semibold">{toast.message}</span>
           </motion.div>
@@ -282,7 +288,11 @@ const BedManagement = () => {
             >
               {updating ? (
                 <>
-                  <ArrowsClockwise size={20} className="animate-spin" weight="bold" />
+                  <ArrowsClockwise
+                    size={20}
+                    className="animate-spin"
+                    weight="bold"
+                  />
                   Updating...
                 </>
               ) : (
@@ -317,8 +327,9 @@ const BedManagement = () => {
                   Critical Capacity Alert
                 </h3>
                 <p className="text-red-200 text-sm">
-                  One or more bed types are at 90% or higher utilization. Consider
-                  coordinating with nearby hospitals for patient overflow.
+                  One or more bed types are at 90% or higher utilization.
+                  Consider coordinating with nearby hospitals for patient
+                  overflow.
                 </p>
               </div>
             </div>
@@ -336,10 +347,30 @@ const BedManagement = () => {
           const change = bedChanges[config.type];
 
           const colorMap = {
-            blue: { gradient: "from-blue-500/20 to-cyan-500/20", border: "border-blue-500/30", text: "text-blue-400", bg: "bg-blue-500/10" },
-            red: { gradient: "from-red-500/20 to-pink-500/20", border: "border-red-500/30", text: "text-red-400", bg: "bg-red-500/10" },
-            orange: { gradient: "from-orange-500/20 to-amber-500/20", border: "border-orange-500/30", text: "text-orange-400", bg: "bg-orange-500/10" },
-            purple: { gradient: "from-purple-500/20 to-pink-500/20", border: "border-purple-500/30", text: "text-purple-400", bg: "bg-purple-500/10" },
+            blue: {
+              gradient: "from-blue-500/20 to-cyan-500/20",
+              border: "border-blue-500/30",
+              text: "text-blue-400",
+              bg: "bg-blue-500/10",
+            },
+            red: {
+              gradient: "from-red-500/20 to-pink-500/20",
+              border: "border-red-500/30",
+              text: "text-red-400",
+              bg: "bg-red-500/10",
+            },
+            orange: {
+              gradient: "from-orange-500/20 to-amber-500/20",
+              border: "border-orange-500/30",
+              text: "text-orange-400",
+              bg: "bg-orange-500/10",
+            },
+            purple: {
+              gradient: "from-purple-500/20 to-pink-500/20",
+              border: "border-purple-500/30",
+              text: "text-purple-400",
+              bg: "bg-purple-500/10",
+            },
           };
 
           const colors = colorMap[config.color];
@@ -352,31 +383,48 @@ const BedManagement = () => {
               transition={{ delay: 0.1 * index }}
               className="relative group"
             >
-              <div className={`absolute inset-0 bg-gradient-to-r ${colors.gradient} rounded-2xl blur-xl group-hover:blur-2xl transition-all`}></div>
-              <div className={`relative bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-xl rounded-2xl p-6 border ${change !== 0 ? colors.border + " border-2 shadow-lg shadow-" + config.color + "-500/20" : "border-gray-700/50"} shadow-xl hover:shadow-2xl transition-all`}>
+              <div
+                className={`absolute inset-0 bg-gradient-to-r ${colors.gradient} rounded-2xl blur-xl group-hover:blur-2xl transition-all`}
+              ></div>
+              <div
+                className={`relative bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-xl rounded-2xl p-6 border ${change !== 0 ? colors.border + " border-2 shadow-lg shadow-" + config.color + "-500/20" : "border-gray-700/50"} shadow-xl hover:shadow-2xl transition-all`}
+              >
                 <div className="flex items-start justify-between mb-6">
                   <div>
                     <div className="flex items-center gap-3 mb-2">
-                      <div className={`w-12 h-12 ${colors.bg} rounded-xl flex items-center justify-center border ${colors.border}`}>
+                      <div
+                        className={`w-12 h-12 ${colors.bg} rounded-xl flex items-center justify-center border ${colors.border}`}
+                      >
                         <span className="text-2xl">{config.icon}</span>
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-white">
                           {config.label}
                         </h3>
-                        <p className="text-sm text-gray-400">{config.description}</p>
+                        <p className="text-sm text-gray-400">
+                          {config.description}
+                        </p>
                       </div>
                     </div>
                   </div>
-                  <div className={`px-4 py-2 rounded-xl ${
-                    utilization >= 90 ? "bg-red-500/20 border border-red-500/30" :
-                    utilization >= 70 ? "bg-orange-500/20 border border-orange-500/30" :
-                    "bg-green-500/20 border border-green-500/30"
-                  }`}>
-                    <span className={`text-2xl font-bold ${
-                      utilization >= 90 ? "text-red-400" :
-                      utilization >= 70 ? "text-orange-400" : "text-green-400"
-                    }`}>
+                  <div
+                    className={`px-4 py-2 rounded-xl ${
+                      utilization >= 90
+                        ? "bg-red-500/20 border border-red-500/30"
+                        : utilization >= 70
+                          ? "bg-orange-500/20 border border-orange-500/30"
+                          : "bg-green-500/20 border border-green-500/30"
+                    }`}
+                  >
+                    <span
+                      className={`text-2xl font-bold ${
+                        utilization >= 90
+                          ? "text-red-400"
+                          : utilization >= 70
+                            ? "text-orange-400"
+                            : "text-green-400"
+                      }`}
+                    >
                       {utilization}%
                     </span>
                   </div>
@@ -386,24 +434,37 @@ const BedManagement = () => {
                 <div className="grid grid-cols-3 gap-4 mb-5">
                   <div className="text-center p-3 bg-gray-700/30 rounded-xl border border-gray-600/30">
                     <p className="text-3xl font-bold text-white">{total}</p>
-                    <p className="text-xs text-gray-400 uppercase tracking-wide mt-1">Total</p>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide mt-1">
+                      Total
+                    </p>
                   </div>
                   <div className="text-center p-3 bg-gray-700/30 rounded-xl border border-gray-600/30 relative">
-                    <p className={`text-3xl font-bold ${change !== 0 ? colors.text : "text-green-400"}`}>
+                    <p
+                      className={`text-3xl font-bold ${change !== 0 ? colors.text : "text-green-400"}`}
+                    >
                       {currentAvailable}
                     </p>
-                    <p className="text-xs text-gray-400 uppercase tracking-wide mt-1">Available</p>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide mt-1">
+                      Available
+                    </p>
                     {change !== 0 && (
-                      <div className={`absolute -top-2 -right-2 px-2 py-1 rounded-lg font-bold text-xs ${
-                        change > 0 ? "bg-green-500 text-white" : "bg-red-500 text-white"
-                      } shadow-lg`}>
-                        {change > 0 ? "+" : ""}{change}
+                      <div
+                        className={`absolute -top-2 -right-2 px-2 py-1 rounded-lg font-bold text-xs ${
+                          change > 0
+                            ? "bg-green-500 text-white"
+                            : "bg-red-500 text-white"
+                        } shadow-lg`}
+                      >
+                        {change > 0 ? "+" : ""}
+                        {change}
                       </div>
                     )}
                   </div>
                   <div className="text-center p-3 bg-gray-700/30 rounded-xl border border-gray-600/30">
                     <p className="text-3xl font-bold text-white">{occupied}</p>
-                    <p className="text-xs text-gray-400 uppercase tracking-wide mt-1">Occupied</p>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide mt-1">
+                      Occupied
+                    </p>
                   </div>
                 </div>
 
@@ -463,7 +524,8 @@ const BedManagement = () => {
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800/50 backdrop-blur-xl rounded-xl border border-gray-700/50">
             <Clock weight="duotone" className="text-gray-400" size={16} />
             <span className="text-sm text-gray-400">
-              Last updated: {new Date(hospitalData.lastBedUpdate).toLocaleString()}
+              Last updated:{" "}
+              {new Date(hospitalData.lastBedUpdate).toLocaleString()}
             </span>
           </div>
         </motion.div>

@@ -16,9 +16,9 @@ import DashboardLayout from "./layouts/DashboardLayout";
 
 function App() {
   return (
-    <AuthProvider>
-      <SidebarProvider>
-        <Router>
+    <Router>
+      <AuthProvider>
+        <SidebarProvider>
           <Routes>
             {/* Public Routes */}
             <Route path="/auth/signin" element={<SignInPage />} />
@@ -40,9 +40,9 @@ function App() {
             {/* Catch all route */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
-        </Router>
-      </SidebarProvider>
-    </AuthProvider>
+        </SidebarProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 

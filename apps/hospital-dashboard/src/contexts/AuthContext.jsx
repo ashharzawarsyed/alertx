@@ -1,8 +1,10 @@
 import React, { createContext, useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [hospital, setHospital] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -17,7 +19,11 @@ export const AuthProvider = ({ children }) => {
     setHospital(null);
     setToken(null);
     localStorage.removeItem("hospital_token");
-  }, []);
+    localStorage.removeItem("hospital_data");
+
+    // Redirect to signin page
+    navigate("/auth/signin");
+  }, [navigate]);
 
   const fetchHospitalDetails = useCallback(
     async (hospitalId) => {

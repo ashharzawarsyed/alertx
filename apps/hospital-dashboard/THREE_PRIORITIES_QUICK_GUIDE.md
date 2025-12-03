@@ -3,15 +3,18 @@
 ## **PRIORITY 1: LIVE MAP TRACKING** ⏱️ 3-4 Days
 
 ### What You'll Build:
+
 **Hospital Dashboard - Live Tracking Page with Real-time Ambulances**
 
 ### Files to Create:
+
 1. `src/features/dashboard/pages/LiveTracking.jsx` (Main map component)
 2. `src/components/AmbulanceInfoPanel.jsx` (Sidebar with ambulance details)
 3. `src/services/trackingService.js` (API & Socket.IO integration)
 4. `src/components/AmbulanceMarker.jsx` (Custom map marker)
 
 ### Key Features:
+
 - ✅ Google Maps with dark theme
 - ✅ Real-time ambulance markers (blue = own, green = incoming)
 - ✅ Click ambulance → Beautiful sidebar shows:
@@ -25,7 +28,9 @@
 - ✅ Smooth marker animations
 
 ### Backend Work:
+
 **New Endpoints:**
+
 ```javascript
 GET /api/v1/hospitals/:id/ambulances/tracking
 GET /api/v1/ambulances/:id/details
@@ -34,6 +39,7 @@ PUT /api/v1/ambulances/:id/arrived
 ```
 
 **Database Update:**
+
 ```javascript
 // Add to Ambulance model
 currentLocation: {
@@ -48,18 +54,20 @@ db.ambulances.createIndex({ "currentLocation": "2dsphere" })
 ```
 
 **Socket.IO Events:**
+
 ```javascript
 // Emit from backend when driver updates location
-io.to(`hospital:${hospitalId}`).emit('ambulance:location', {
+io.to(`hospital:${hospitalId}`).emit("ambulance:location", {
   ambulanceId,
   location: { lat, lng },
   heading,
   speed,
-  eta
+  eta,
 });
 ```
 
 ### Install Dependencies:
+
 ```bash
 cd apps/hospital-dashboard
 npm install @react-google-maps/api @googlemaps/js-api-loader
@@ -69,6 +77,7 @@ npm install @googlemaps/google-maps-services-js geolib
 ```
 
 ### Success Criteria:
+
 - [ ] Map loads with hospital at center
 - [ ] Ambulances display as colored markers
 - [ ] Clicking marker shows detailed info panel
@@ -81,13 +90,16 @@ npm install @googlemaps/google-maps-services-js geolib
 ## **PRIORITY 2: EMERGENCY QUEUE ↔ TRACKING INTEGRATION** ⏱️ 2-3 Days
 
 ### What You'll Build:
+
 **Connect Emergency Queue to Ambulance Tracking**
 
 ### Files to Update:
+
 1. `src/features/dashboard/pages/EmergencyQueue.jsx` (Add ambulance info)
 2. `src/services/emergencyService.js` (Add ambulance assignment)
 
 ### Key Features:
+
 - ✅ Enhanced "Accept Emergency" modal:
   - Shows available ambulances
   - Select bed + ambulance together
@@ -102,7 +114,9 @@ npm install @googlemaps/google-maps-services-js geolib
 - ✅ Arrival notification when ambulance reaches hospital
 
 ### Backend Work:
+
 **New Endpoints:**
+
 ```javascript
 POST /api/v1/emergencies/:id/assign-ambulance
 Body: { ambulanceId, bedType, bedNumber }
@@ -116,35 +130,38 @@ Response: [{ id, number, distance, eta, driver }]
 
 **New Service:**
 `apps/backend/services/emergencyAmbulanceService.js`
+
 ```javascript
 // Handles:
-- assignAmbulance(emergencyId, ambulanceId)
-- getAvailableAmbulances(hospitalId, location)
-- trackEmergencyAmbulance(emergencyId)
-- calculateETA(from, to)
+-assignAmbulance(emergencyId, ambulanceId) -
+  getAvailableAmbulances(hospitalId, location) -
+  trackEmergencyAmbulance(emergencyId) -
+  calculateETA(from, to);
 ```
 
 **Socket.IO Events:**
+
 ```javascript
 // When hospital assigns ambulance
-socket.emit('emergency:assign_ambulance', { emergencyId, ambulanceId });
+socket.emit("emergency:assign_ambulance", { emergencyId, ambulanceId });
 
 // Backend broadcasts to driver
-io.to(`driver:${driverId}`).emit('emergency:assigned', {
+io.to(`driver:${driverId}`).emit("emergency:assigned", {
   emergency,
   route,
-  patient
+  patient,
 });
 
 // Backend broadcasts to hospital
-io.to(`hospital:${hospitalId}`).emit('emergency:ambulance_dispatched', {
+io.to(`hospital:${hospitalId}`).emit("emergency:ambulance_dispatched", {
   emergencyId,
   ambulance,
-  eta
+  eta,
 });
 ```
 
 ### Success Criteria:
+
 - [ ] Accept modal shows available ambulances with distances
 - [ ] Ambulance assignment works end-to-end
 - [ ] Emergency card displays ambulance info after acceptance
@@ -157,12 +174,15 @@ io.to(`hospital:${hospitalId}`).emit('emergency:ambulance_dispatched', {
 ## **PRIORITY 3: COMPLETE APP INTEGRATION** ⏱️ 3-4 Days
 
 ### What You'll Build:
+
 **Connect User App ↔ Driver App ↔ Hospital Dashboard**
 
 ### User App Updates:
+
 **File:** `apps/emergency-user-app/src/screens/EmergencyTrackingScreen.tsx`
 
 **Add:**
+
 ```typescript
 // Real-time ambulance tracking
 socket.on('emergency:ambulance_assigned', (data) => {
@@ -184,13 +204,14 @@ socket.on('emergency:ambulance_location', (data) => {
 ```
 
 **Display:**
+
 ```typescript
 <AmbulanceTrackingView>
   <Map>
     Patient, Ambulance, Hospital markers
     Route polyline
   </Map>
-  
+
   <InfoCard>
     Vehicle: AMB-001
     Driver: John Doe
@@ -202,9 +223,11 @@ socket.on('emergency:ambulance_location', (data) => {
 ```
 
 ### Driver App Updates:
+
 **File:** `apps/emergency-driver-app/src/screens/ActiveEmergencyScreen.tsx`
 
 **Enhanced Location Tracking:**
+
 ```typescript
 // Update location every 5 seconds
 const watchId = Geolocation.watchPosition(
@@ -213,17 +236,17 @@ const watchId = Geolocation.watchPosition(
       lat: position.coords.latitude,
       lng: position.coords.longitude,
       heading: position.coords.heading,
-      speed: position.coords.speed
+      speed: position.coords.speed,
     };
 
     // Send to backend
     ambulanceService.updateLocation(ambulanceId, location);
 
     // Emit via Socket.IO
-    socket.emit('ambulance:location_update', {
+    socket.emit("ambulance:location_update", {
       ambulanceId,
       location,
-      emergencyId
+      emergencyId,
     });
   },
   { interval: 5000, enableHighAccuracy: true }
@@ -231,6 +254,7 @@ const watchId = Geolocation.watchPosition(
 ```
 
 **Status Updates:**
+
 ```typescript
 // Driver workflow
 1. Accept Emergency → status: "dispatched"
@@ -244,6 +268,7 @@ socket.emit('ambulance:status', { ambulanceId, status });
 ```
 
 **Add Crew Management:**
+
 ```typescript
 <CrewManagement>
   <AddCrew>
@@ -251,7 +276,7 @@ socket.emit('ambulance:status', { ambulanceId, status });
     Role: [Paramedic/Nurse/EMT]
     Certification: [Input]
   </AddCrew>
-  
+
   <CurrentCrew>
     {crew.map(member => (
       <CrewCard>{member.name} - {member.role}</CrewCard>
@@ -261,32 +286,34 @@ socket.emit('ambulance:status', { ambulanceId, status });
 ```
 
 ### Backend Orchestration:
+
 **File:** `apps/backend/services/emergencyOrchestrationService.js`
 
 **Complete Flow:**
+
 ```javascript
 1. User creates emergency
    → AI triage
    → Notify nearby hospitals
-   
+
 2. Hospital accepts
    → Assign ambulance
    → Calculate route
    → Notify driver
-   
+
 3. Driver accepts
    → Start GPS tracking
    → Notify user & hospital
-   
+
 4. Real-time updates
    → Location every 5s
    → ETA recalculation
    → Broadcast to all parties
-   
+
 5. Pickup patient
    → New route to hospital
    → Update status
-   
+
 6. Arrive at hospital
    → Complete emergency
    → Update bed availability
@@ -294,6 +321,7 @@ socket.emit('ambulance:status', { ambulanceId, status });
 ```
 
 **Key Socket.IO Events:**
+
 ```javascript
 // User → Backend → Hospital
 'emergency:create' → 'emergency:new'
@@ -309,15 +337,18 @@ socket.emit('ambulance:status', { ambulanceId, status });
 ```
 
 ### Database Sync Service:
+
 **File:** `apps/backend/services/dataSyncService.js`
 
 **Ensures:**
+
 - Bed availability syncs to all apps
 - Emergency status syncs everywhere
 - Ambulance location updates all clients
 - No stale data anywhere
 
 ### Success Criteria:
+
 - [ ] User creates emergency → Hospitals receive notification
 - [ ] Hospital accepts → User sees hospital info
 - [ ] Hospital assigns ambulance → Driver gets notification
@@ -364,14 +395,17 @@ USER APP                    BACKEND                    DRIVER APP              H
 ## 🚀 **IMPLEMENTATION ORDER**
 
 ### Week 1: Priority 1
+
 **Days 1-2:** Map component, markers, Google Maps integration  
 **Days 3-4:** Socket.IO, real-time updates, ambulance info panel
 
 ### Week 2: Priority 2
+
 **Days 1-2:** Emergency-ambulance assignment flow, backend endpoints  
 **Day 3:** Emergency queue integration, testing
 
 ### Week 3: Priority 3
+
 **Days 1-2:** User app tracking, driver app location updates  
 **Days 3-4:** Backend orchestration, data sync, end-to-end testing
 
@@ -402,18 +436,21 @@ npm install @react-native-community/geolocation (already installed)
 ## ✅ **FINAL CHECKLIST**
 
 ### Priority 1 Complete When:
+
 - [ ] Map displays ambulances in real-time
 - [ ] Clicking ambulance shows detailed info
 - [ ] ETA updates every 5 seconds
 - [ ] Can call driver from dashboard
 
 ### Priority 2 Complete When:
+
 - [ ] Hospital can assign ambulance to emergency
 - [ ] Emergency card shows ambulance tracking
 - [ ] "Track on Map" button works
 - [ ] Status syncs (Pending → En Route → Arrived)
 
 ### Priority 3 Complete When:
+
 - [ ] User creates emergency → Driver notified
 - [ ] Driver accepts → User sees ambulance
 - [ ] Location updates in all 3 apps

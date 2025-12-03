@@ -1,15 +1,18 @@
 # Hospital Dashboard - Complete Integration Roadmap
+
 ## Connecting Hospital Dashboard with User App, Driver App & Backend
 
 ---
 
 ## 🎯 **PRIORITY 1: LIVE MAP TRACKING SYSTEM**
+
 **Timeline:** 3-4 days  
 **Focus:** Real-time ambulance tracking with beautiful UI
 
 ### What Will Be Built:
 
 #### 1. **Live Tracking Page** (`LiveTracking.jsx`)
+
 - Google Maps with dark theme
 - Real-time ambulance markers (own fleet + incoming)
 - Hospital location marker (purple/pink gradient)
@@ -18,6 +21,7 @@
 - Statistics overlay (Total, En Route, Available, Critical)
 
 #### 2. **Ambulance Info Sidebar** (`AmbulanceInfoPanel.jsx`)
+
 - Slides in when clicking ambulance marker
 - Shows:
   - Vehicle number and status
@@ -30,6 +34,7 @@
 - Actions: Call Driver, View Route, Mark as Arrived
 
 #### 3. **Map Features**
+
 - Custom markers with color coding:
   - Blue: Own ambulances (available)
   - Blue pulsing: Own ambulances (dispatched)
@@ -40,6 +45,7 @@
 - Fullscreen mode
 
 #### 4. **Socket.IO Integration**
+
 - Real-time location updates (every 5 seconds)
 - Status change notifications
 - New dispatch alerts
@@ -49,6 +55,7 @@
 ### Backend Requirements:
 
 **New API Endpoints:**
+
 ```
 GET    /api/v1/hospitals/:id/ambulances/tracking
 GET    /api/v1/ambulances/:id/details
@@ -57,19 +64,21 @@ PUT    /api/v1/ambulances/:id/arrived
 ```
 
 **Socket.IO Events:**
+
 ```javascript
 // Listen
-socket.on('ambulance:location', updateMarker);
-socket.on('ambulance:status', updateStatus);
-socket.on('emergency:dispatched', showNewIncoming);
-socket.on('ambulance:arrived', showArrivalNotification);
+socket.on("ambulance:location", updateMarker);
+socket.on("ambulance:status", updateStatus);
+socket.on("emergency:dispatched", showNewIncoming);
+socket.on("ambulance:arrived", showArrivalNotification);
 
 // Emit
-socket.emit('hospital:join', hospitalId);
-socket.emit('ambulance:track', ambulanceId);
+socket.emit("hospital:join", hospitalId);
+socket.emit("ambulance:track", ambulanceId);
 ```
 
 **Database Updates:**
+
 ```javascript
 // Ambulance schema enhancement
 currentLocation: {
@@ -85,6 +94,7 @@ ambulanceSchema.index({ 'currentLocation': '2dsphere' });
 ```
 
 ### Dependencies to Install:
+
 ```bash
 cd apps/hospital-dashboard
 npm install @react-google-maps/api @googlemaps/js-api-loader
@@ -93,12 +103,14 @@ npm install @react-google-maps/api @googlemaps/js-api-loader
 ---
 
 ## 🎯 **PRIORITY 2: EMERGENCY QUEUE ↔ LIVE TRACKING INTEGRATION**
+
 **Timeline:** 2-3 days  
 **Focus:** Connect emergency requests to real-time ambulance dispatch
 
 ### What Will Be Built:
 
 #### 1. **Enhanced Emergency Queue** (Update existing `EmergencyQueue.jsx`)
+
 - Add "Track Ambulance" button for accepted emergencies
 - Show ambulance details in emergency card
 - Display real-time ETA
@@ -108,6 +120,7 @@ npm install @react-google-maps/api @googlemaps/js-api-loader
 #### 2. **Emergency → Ambulance Assignment Flow**
 
 **When Hospital Accepts Emergency:**
+
 ```javascript
 // User flow:
 1. Hospital clicks "Accept & Assign Bed"
@@ -121,19 +134,18 @@ npm install @react-google-maps/api @googlemaps/js-api-loader
 ```
 
 **Updated Accept Modal:**
+
 ```javascript
 <AcceptEmergencyModal>
   <BedSelection>
     Select Bed Type: ICU, General, Emergency, Operation
   </BedSelection>
-  
+
   <AmbulanceSelection>
-    Available Ambulances:
-    • AMB-001 (2.5 km away) - Driver: John Doe
-    • AMB-002 (3.8 km away) - Driver: Sarah Smith
-    [Auto-assign nearest] [Manual select]
+    Available Ambulances: • AMB-001 (2.5 km away) - Driver: John Doe • AMB-002
+    (3.8 km away) - Driver: Sarah Smith [Auto-assign nearest] [Manual select]
   </AmbulanceSelection>
-  
+
   <ConfirmButton>Assign & Dispatch</ConfirmButton>
 </AcceptEmergencyModal>
 ```
@@ -141,6 +153,7 @@ npm install @react-google-maps/api @googlemaps/js-api-loader
 #### 3. **Real-Time Status Updates**
 
 **Emergency Card Enhancement:**
+
 ```javascript
 // Before acceptance: Show patient info only
 <EmergencyCard status="pending">
@@ -161,6 +174,7 @@ npm install @react-google-maps/api @googlemaps/js-api-loader
 #### 4. **Backend Integration**
 
 **New Service:** `emergencyAmbulanceService.js`
+
 ```javascript
 class EmergencyAmbulanceService {
   // Assign ambulance to emergency
@@ -192,6 +206,7 @@ class EmergencyAmbulanceService {
 ### Backend Requirements:
 
 **API Endpoints:**
+
 ```
 POST   /api/v1/emergencies/:id/assign-ambulance
 Body: { ambulanceId, bedType, bedNumber }
@@ -204,17 +219,18 @@ Response: [{ ambulance, distance, eta }]
 ```
 
 **Socket Events:**
+
 ```javascript
 // Hospital dashboard listens
-socket.on('emergency:ambulance_assigned', (data) => {
+socket.on("emergency:ambulance_assigned", (data) => {
   // Update emergency card with ambulance info
 });
 
-socket.on('emergency:ambulance_location', (data) => {
+socket.on("emergency:ambulance_location", (data) => {
   // Update ETA in emergency card
 });
 
-socket.on('ambulance:arrived', (data) => {
+socket.on("ambulance:arrived", (data) => {
   // Show arrival notification
   // Update emergency status to "arrived"
 });
@@ -223,6 +239,7 @@ socket.on('ambulance:arrived', (data) => {
 ---
 
 ## 🎯 **PRIORITY 3: COMPLETE END-TO-END INTEGRATION**
+
 **Timeline:** 3-4 days  
 **Focus:** User App → Driver App → Hospital Dashboard data flow
 
@@ -231,30 +248,32 @@ socket.on('ambulance:arrived', (data) => {
 #### 1. **User App Integration** (Emergency User App)
 
 **Update `EmergencyTrackingScreen.tsx`:**
+
 ```typescript
 // Add real-time tracking of assigned ambulance
 useEffect(() => {
-  socket.on('emergency:ambulance_assigned', (data) => {
+  socket.on("emergency:ambulance_assigned", (data) => {
     setAmbulance(data.ambulance);
     setDriver(data.driver);
     setCrew(data.crew);
     setETA(data.eta);
   });
 
-  socket.on('emergency:ambulance_location', (data) => {
+  socket.on("emergency:ambulance_location", (data) => {
     updateAmbulanceMarker(data.location);
     setETA(data.eta);
   });
 
-  socket.on('emergency:status', (data) => {
-    if (data.status === 'arrived') {
-      navigation.navigate('ArrivalConfirmation');
+  socket.on("emergency:status", (data) => {
+    if (data.status === "arrived") {
+      navigation.navigate("ArrivalConfirmation");
     }
   });
 }, [emergencyId]);
 ```
 
 **Add Ambulance Tracking View:**
+
 ```typescript
 <MapView>
   <PatientMarker location={patientLocation} />
@@ -275,6 +294,7 @@ useEffect(() => {
 #### 2. **Driver App Integration** (Emergency Driver App)
 
 **Update `ActiveEmergencyScreen.tsx`:**
+
 ```typescript
 // Enhanced location tracking
 const startLocationTracking = () => {
@@ -291,10 +311,10 @@ const startLocationTracking = () => {
       ambulanceService.updateLocation(ambulanceId, location);
 
       // Emit via Socket.IO
-      socket.emit('ambulance:location_update', {
+      socket.emit("ambulance:location_update", {
         ambulanceId,
         location,
-        emergencyId
+        emergencyId,
       });
     },
     { enableHighAccuracy: true, interval: 5000 }
@@ -303,15 +323,16 @@ const startLocationTracking = () => {
 
 // Status updates
 const updateStatus = (status) => {
-  socket.emit('ambulance:status', {
+  socket.emit("ambulance:status", {
     ambulanceId,
     status, // "dispatched", "en-route", "at-scene", "returning"
-    emergencyId
+    emergencyId,
   });
 };
 ```
 
 **Add Crew Management:**
+
 ```typescript
 <CrewSection>
   <AddCrewMember>
@@ -320,7 +341,7 @@ const updateStatus = (status) => {
     Certification: [Input]
     [Add to Crew]
   </AddCrewMember>
-  
+
   <CurrentCrew>
     {crew.map(member => (
       <CrewCard>
@@ -348,7 +369,7 @@ class EmergencyOrchestrationService {
       location: data.location,
       condition: data.condition,
       severity: data.severity,
-      status: 'pending'
+      status: "pending",
     });
 
     // AI Triage
@@ -364,10 +385,10 @@ class EmergencyOrchestrationService {
     );
 
     // Notify hospitals
-    hospitals.forEach(hospital => {
-      io.to(`hospital:${hospital._id}`).emit('emergency:new', {
+    hospitals.forEach((hospital) => {
+      io.to(`hospital:${hospital._id}`).emit("emergency:new", {
         emergency,
-        distance: calculateDistance(hospital.location, data.location)
+        distance: calculateDistance(hospital.location, data.location),
       });
     });
 
@@ -377,12 +398,12 @@ class EmergencyOrchestrationService {
   // STEP 2: Hospital accepts emergency
   async acceptEmergency(emergencyId, hospitalId, bedType) {
     const emergency = await Emergency.findById(emergencyId);
-    
-    emergency.status = 'accepted';
+
+    emergency.status = "accepted";
     emergency.destinationHospital = {
       hospitalId,
       bedType,
-      acceptedAt: new Date()
+      acceptedAt: new Date(),
     };
     await emergency.save();
 
@@ -398,10 +419,10 @@ class EmergencyOrchestrationService {
     }
 
     // Notify user
-    io.to(`user:${emergency.userId}`).emit('emergency:accepted', {
+    io.to(`user:${emergency.userId}`).emit("emergency:accepted", {
       hospital: await Hospital.findById(hospitalId),
       ambulance: ambulance || null,
-      bedType
+      bedType,
     });
 
     return emergency;
@@ -425,89 +446,92 @@ class EmergencyOrchestrationService {
       driver: ambulance.driver,
       crew: ambulance.crew,
       dispatchTime: new Date(),
-      estimatedArrival: new Date(Date.now() + route.duration * 60000)
+      estimatedArrival: new Date(Date.now() + route.duration * 60000),
     };
     emergency.route = {
       distance: route.distance,
       duration: route.duration,
-      polyline: route.polyline
+      polyline: route.polyline,
     };
     await emergency.save();
 
     // Update ambulance
-    ambulance.status = 'dispatched';
+    ambulance.status = "dispatched";
     ambulance.currentEmergency = emergencyId;
     await ambulance.save();
 
     // Notify driver
-    io.to(`driver:${ambulance.driver.userId}`).emit('emergency:assigned', {
+    io.to(`driver:${ambulance.driver.userId}`).emit("emergency:assigned", {
       emergency,
       route,
       patient: {
         name: emergency.patientName,
         age: emergency.patientAge,
-        condition: emergency.condition
-      }
+        condition: emergency.condition,
+      },
     });
 
     // Notify user
-    io.to(`user:${emergency.userId}`).emit('emergency:ambulance_assigned', {
+    io.to(`user:${emergency.userId}`).emit("emergency:ambulance_assigned", {
       ambulance: {
         vehicleNumber: ambulance.vehicleNumber,
         driver: ambulance.driver,
-        crew: ambulance.crew
+        crew: ambulance.crew,
       },
-      eta: route.duration
+      eta: route.duration,
     });
 
     // Notify hospital
-    io.to(`hospital:${emergency.destinationHospital.hospitalId}`)
-      .emit('emergency:ambulance_dispatched', {
+    io.to(`hospital:${emergency.destinationHospital.hospitalId}`).emit(
+      "emergency:ambulance_dispatched",
+      {
         emergencyId,
         ambulance,
-        eta: route.duration
-      });
+        eta: route.duration,
+      }
+    );
   }
 
   // STEP 4: Driver accepts emergency
   async driverAcceptEmergency(ambulanceId, emergencyId) {
     const ambulance = await Ambulance.findById(ambulanceId);
-    
-    ambulance.status = 'en-route';
+
+    ambulance.status = "en-route";
     await ambulance.save();
 
     const emergency = await Emergency.findById(emergencyId);
-    emergency.status = 'en-route';
+    emergency.status = "en-route";
     await emergency.save();
 
     // Start location tracking
     // Notify all parties
-    io.to(`user:${emergency.userId}`).emit('emergency:driver_on_way', {
+    io.to(`user:${emergency.userId}`).emit("emergency:driver_on_way", {
       driver: ambulance.driver,
-      eta: emergency.route.duration
+      eta: emergency.route.duration,
     });
   }
 
   // STEP 5: Real-time location updates
   async updateAmbulanceLocation(ambulanceId, locationData) {
     const ambulance = await Ambulance.findById(ambulanceId);
-    
+
     ambulance.currentLocation = {
-      type: 'Point',
+      type: "Point",
       coordinates: [locationData.lng, locationData.lat],
       heading: locationData.heading,
       speed: locationData.speed,
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
     };
     await ambulance.save();
 
     if (ambulance.currentEmergency) {
       const emergency = await Emergency.findById(ambulance.currentEmergency);
-      
+
       // Recalculate ETA
-      const destination = emergency.status === 'returning' 
-        ? emergency.destinationHospital.location
-        : emergency.location;
+      const destination =
+        emergency.status === "returning"
+          ? emergency.destinationHospital.location
+          : emergency.location;
 
       const route = await googleMapsService.getRoute(
         { lat: locationData.lat, lng: locationData.lng },
@@ -515,18 +539,20 @@ class EmergencyOrchestrationService {
       );
 
       // Broadcast to all parties
-      io.to(`user:${emergency.userId}`).emit('emergency:ambulance_location', {
+      io.to(`user:${emergency.userId}`).emit("emergency:ambulance_location", {
         location: locationData,
-        eta: route.duration
+        eta: route.duration,
       });
 
-      io.to(`hospital:${emergency.destinationHospital.hospitalId}`)
-        .emit('ambulance:location', {
+      io.to(`hospital:${emergency.destinationHospital.hospitalId}`).emit(
+        "ambulance:location",
+        {
           ambulanceId,
           emergencyId: emergency._id,
           location: locationData,
-          eta: route.duration
-        });
+          eta: route.duration,
+        }
+      );
     }
   }
 
@@ -535,10 +561,10 @@ class EmergencyOrchestrationService {
     const ambulance = await Ambulance.findById(ambulanceId);
     const emergency = await Emergency.findById(emergencyId);
 
-    ambulance.status = 'returning';
+    ambulance.status = "returning";
     await ambulance.save();
 
-    emergency.status = 'in-transit';
+    emergency.status = "in-transit";
     emergency.pickupTime = new Date();
     await emergency.save();
 
@@ -549,17 +575,21 @@ class EmergencyOrchestrationService {
     );
 
     // Notify hospital
-    io.to(`hospital:${emergency.destinationHospital.hospitalId}`)
-      .emit('emergency:patient_picked_up', {
+    io.to(`hospital:${emergency.destinationHospital.hospitalId}`).emit(
+      "emergency:patient_picked_up",
+      {
         emergencyId,
         ambulance,
-        eta: route.duration
-      });
+        eta: route.duration,
+      }
+    );
 
     // Notify user
-    io.to(`user:${emergency.userId}`).emit('emergency:on_way_to_hospital', {
-      hospital: await Hospital.findById(emergency.destinationHospital.hospitalId),
-      eta: route.duration
+    io.to(`user:${emergency.userId}`).emit("emergency:on_way_to_hospital", {
+      hospital: await Hospital.findById(
+        emergency.destinationHospital.hospitalId
+      ),
+      eta: route.duration,
     });
   }
 
@@ -568,39 +598,39 @@ class EmergencyOrchestrationService {
     const ambulance = await Ambulance.findById(ambulanceId);
     const emergency = await Emergency.findById(emergencyId);
 
-    ambulance.status = 'available';
+    ambulance.status = "available";
     ambulance.currentEmergency = null;
     await ambulance.save();
 
-    emergency.status = 'completed';
+    emergency.status = "completed";
     emergency.completedAt = new Date();
     await emergency.save();
 
     // Update hospital bed availability
     await Hospital.findByIdAndUpdate(hospitalId, {
       $inc: {
-        [`availableBeds.${emergency.destinationHospital.bedType}`]: -1
-      }
+        [`availableBeds.${emergency.destinationHospital.bedType}`]: -1,
+      },
     });
 
     // Notify hospital
-    io.to(`hospital:${hospitalId}`).emit('ambulance:arrived', {
+    io.to(`hospital:${hospitalId}`).emit("ambulance:arrived", {
       ambulance,
       emergency,
       patient: {
         name: emergency.patientName,
         age: emergency.patientAge,
         condition: emergency.condition,
-        vitals: emergency.vitals
+        vitals: emergency.vitals,
       },
-      assignedBed: emergency.destinationHospital.bedType
+      assignedBed: emergency.destinationHospital.bedType,
     });
 
     // Notify user
-    io.to(`user:${emergency.userId}`).emit('emergency:completed', {
+    io.to(`user:${emergency.userId}`).emit("emergency:completed", {
       hospital: await Hospital.findById(hospitalId),
       bedAssigned: emergency.destinationHospital.bedType,
-      completedAt: emergency.completedAt
+      completedAt: emergency.completedAt,
     });
   }
 }
@@ -615,56 +645,60 @@ class DataSyncService {
   // Sync hospital bed availability
   async syncBedAvailability(hospitalId) {
     const hospital = await Hospital.findById(hospitalId);
-    
+
     // Broadcast to all connected clients
-    io.to(`hospital:${hospitalId}`).emit('bed:updated', {
+    io.to(`hospital:${hospitalId}`).emit("bed:updated", {
       availableBeds: hospital.availableBeds,
-      totalBeds: hospital.totalBeds
+      totalBeds: hospital.totalBeds,
     });
 
     // Broadcast to user apps searching for hospitals
-    io.emit('hospitals:bed_update', {
+    io.emit("hospitals:bed_update", {
       hospitalId,
-      availableBeds: hospital.availableBeds
+      availableBeds: hospital.availableBeds,
     });
   }
 
   // Sync emergency status across all apps
   async syncEmergencyStatus(emergencyId) {
     const emergency = await Emergency.findById(emergencyId)
-      .populate('destinationHospital.hospitalId')
-      .populate('assignedAmbulance.ambulanceId');
+      .populate("destinationHospital.hospitalId")
+      .populate("assignedAmbulance.ambulanceId");
 
     // Notify user
-    io.to(`user:${emergency.userId}`).emit('emergency:sync', {
+    io.to(`user:${emergency.userId}`).emit("emergency:sync", {
       status: emergency.status,
       ambulance: emergency.assignedAmbulance,
-      hospital: emergency.destinationHospital
+      hospital: emergency.destinationHospital,
     });
 
     // Notify hospital
     if (emergency.destinationHospital?.hospitalId) {
-      io.to(`hospital:${emergency.destinationHospital.hospitalId}`)
-        .emit('emergency:sync', emergency);
+      io.to(`hospital:${emergency.destinationHospital.hospitalId}`).emit(
+        "emergency:sync",
+        emergency
+      );
     }
 
     // Notify driver
     if (emergency.assignedAmbulance?.driver?.userId) {
-      io.to(`driver:${emergency.assignedAmbulance.driver.userId}`)
-        .emit('emergency:sync', emergency);
+      io.to(`driver:${emergency.assignedAmbulance.driver.userId}`).emit(
+        "emergency:sync",
+        emergency
+      );
     }
   }
 
   // Sync ambulance status
   async syncAmbulanceStatus(ambulanceId) {
     const ambulance = await Ambulance.findById(ambulanceId);
-    
+
     // Notify hospital
-    io.to(`hospital:${ambulance.hospitalId}`).emit('ambulance:status_sync', {
+    io.to(`hospital:${ambulance.hospitalId}`).emit("ambulance:status_sync", {
       ambulanceId,
       status: ambulance.status,
       location: ambulance.currentLocation,
-      currentEmergency: ambulance.currentEmergency
+      currentEmergency: ambulance.currentEmergency,
     });
   }
 }
@@ -719,6 +753,7 @@ USER APP                  BACKEND                    DRIVER APP                 
 ### Environment Variables
 
 **Hospital Dashboard (.env):**
+
 ```env
 REACT_APP_API_URL=http://localhost:5001
 REACT_APP_SOCKET_URL=http://localhost:5001
@@ -726,23 +761,26 @@ REACT_APP_GOOGLE_MAPS_KEY=AIzaSyCgEmYHXUzysg6yRptadI6kv1BnXaNAIPI
 ```
 
 **Backend (.env):**
+
 ```env
 GOOGLE_MAPS_API_KEY=AIzaSyCgEmYHXUzysg6yRptadI6kv1BnXaNAIPI
 SOCKET_PORT=5001
 ```
 
 **User App (Config.ts):**
+
 ```typescript
-API_URL: "http://192.168.100.23:5001"
-SOCKET_URL: "http://192.168.100.23:5001"
-GOOGLE_MAPS_KEY: "AIzaSyCgEmYHXUzysg6yRptadI6kv1BnXaNAIPI"
+API_URL: "http://192.168.100.23:5001";
+SOCKET_URL: "http://192.168.100.23:5001";
+GOOGLE_MAPS_KEY: "AIzaSyCgEmYHXUzysg6yRptadI6kv1BnXaNAIPI";
 ```
 
 **Driver App (Config.ts):**
+
 ```typescript
-API_URL: "http://192.168.100.23:5001"
-SOCKET_URL: "http://192.168.100.23:5001"
-LOCATION_UPDATE_INTERVAL: 5000 // 5 seconds
+API_URL: "http://192.168.100.23:5001";
+SOCKET_URL: "http://192.168.100.23:5001";
+LOCATION_UPDATE_INTERVAL: 5000; // 5 seconds
 ```
 
 ---
@@ -750,6 +788,7 @@ LOCATION_UPDATE_INTERVAL: 5000 // 5 seconds
 ## 🧪 **Testing Checklist**
 
 ### Priority 1 Testing
+
 - [ ] Map displays with dark theme
 - [ ] Hospital marker shows at correct location
 - [ ] Ambulance markers display correctly
@@ -759,6 +798,7 @@ LOCATION_UPDATE_INTERVAL: 5000 // 5 seconds
 - [ ] Location updates reflect on map
 
 ### Priority 2 Testing
+
 - [ ] Emergency queue shows incoming requests
 - [ ] Accept modal displays available ambulances
 - [ ] Assigning ambulance updates emergency card
@@ -767,6 +807,7 @@ LOCATION_UPDATE_INTERVAL: 5000 // 5 seconds
 - [ ] Ambulance arrival updates emergency status
 
 ### Priority 3 Testing
+
 - [ ] User creates emergency → Hospitals notified
 - [ ] Hospital accepts → User notified
 - [ ] Driver accepts → All parties notified
@@ -780,6 +821,7 @@ LOCATION_UPDATE_INTERVAL: 5000 // 5 seconds
 ## 📦 **Deployment Checklist**
 
 ### Backend
+
 - [ ] Google Maps API key configured
 - [ ] Socket.IO CORS settings correct
 - [ ] Database indexes created
@@ -787,12 +829,14 @@ LOCATION_UPDATE_INTERVAL: 5000 // 5 seconds
 - [ ] SSL/TLS certificates installed
 
 ### Hospital Dashboard
+
 - [ ] Google Maps API key in .env
 - [ ] Socket.IO URL points to production
 - [ ] Build optimized for production
 - [ ] Deployed to hosting (Vercel/Netlify)
 
 ### Mobile Apps
+
 - [ ] API URLs point to production
 - [ ] Google Maps configured in app.json
 - [ ] Location permissions requested

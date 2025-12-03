@@ -33,7 +33,7 @@ api.interceptors.response.use(
     if (error.response) {
       // Server responded with error
       const { status, data } = error.response;
-      
+
       if (status === 401) {
         // Unauthorized - clear token and redirect to login
         localStorage.removeItem("hospital_token");
@@ -51,7 +51,7 @@ api.interceptors.response.use(
       // Error setting up request
       console.error("Request error:", error.message);
     }
-    
+
     return Promise.reject(error);
   }
 );

@@ -5,6 +5,7 @@
 ### 1. Frontend Components
 
 #### **LiveTracking.jsx** (Main Map Page)
+
 - **Location**: `apps/hospital-dashboard/src/pages/LiveTracking.jsx`
 - **Features**:
   - Google Maps integration with dark theme
@@ -20,6 +21,7 @@
   - Click handler to open ambulance info panel
 
 #### **AmbulanceInfoPanel.jsx** (Sidebar Info Panel)
+
 - **Location**: `apps/hospital-dashboard/src/components/AmbulanceInfoPanel.jsx`
 - **Features**:
   - Slide-in glassmorphic panel from right
@@ -35,6 +37,7 @@
 ### 2. Services
 
 #### **trackingService.js** (Real-time Data Service)
+
 - **Location**: `apps/hospital-dashboard/src/services/trackingService.js`
 - **Features**:
   - Socket.IO connection management
@@ -53,6 +56,7 @@
   - Connection status monitoring
 
 #### **api.js** (HTTP API Service)
+
 - **Location**: `apps/hospital-dashboard/src/services/api.js`
 - **Features**:
   - Axios instance with base URL
@@ -64,16 +68,19 @@
 ### 3. Navigation Integration
 
 #### **DashboardLayout.jsx**
+
 - Added route: `/dashboard/tracking` → `LiveTracking` component
 - LiveTracking doesn't use LayoutV2 wrapper (full-screen map)
 
 #### **SidebarNew.jsx**
+
 - Added navigation item: "Live Tracking" with MapTrifold icon
 - Positioned after "Ambulance Fleet"
 
 ### 4. Configuration
 
 #### **.env**
+
 - Updated `VITE_GOOGLE_MAPS_API_KEY` with actual API key
 - Existing Socket.IO URL: `http://localhost:5001`
 - API URL: `http://localhost:5001/api/v1`
@@ -83,8 +90,9 @@
 ### Filtering Logic (Hospital-Specific View)
 
 The hospital dashboard shows **ONLY**:
+
 1. **Own Ambulances**: `ambulance.hospitalId === currentHospitalId`
-2. **Incoming Ambulances**: 
+2. **Incoming Ambulances**:
    - `ambulance.destinationHospitalId === currentHospitalId`
    - AND `ambulance.status === 'en-route' or 'returning'`
 
@@ -155,41 +163,45 @@ Response: { success: true, message: "Ambulance marked as arrived" }
 ### Socket.IO Events
 
 #### Hospital Joins Room
+
 ```javascript
-socket.emit('hospital:join', hospitalId);
+socket.emit("hospital:join", hospitalId);
 ```
 
 #### Backend Emits to Hospital Room
+
 ```javascript
 // Location update
-io.to(`hospital:${hospitalId}`).emit('ambulance:location', {
-  ambulanceId: 'amb123',
-  location: { type: 'Point', coordinates: [-74.006, 40.7128] },
+io.to(`hospital:${hospitalId}`).emit("ambulance:location", {
+  ambulanceId: "amb123",
+  location: { type: "Point", coordinates: [-74.006, 40.7128] },
   heading: 45,
   speed: 60,
-  timestamp: '2024-01-15T10:25:00Z'
+  timestamp: "2024-01-15T10:25:00Z",
 });
 
 // Status update
-io.to(`hospital:${hospitalId}`).emit('ambulance:status', {
-  ambulanceId: 'amb123',
-  status: 'en-route',
-  timestamp: '2024-01-15T10:25:00Z'
+io.to(`hospital:${hospitalId}`).emit("ambulance:status", {
+  ambulanceId: "amb123",
+  status: "en-route",
+  timestamp: "2024-01-15T10:25:00Z",
 });
 
 // New dispatch (incoming ambulance)
-io.to(`hospital:${hospitalId}`).emit('emergency:dispatched', {
-  emergencyId: 'emg123',
-  ambulance: { /* Full ambulance object */ },
+io.to(`hospital:${hospitalId}`).emit("emergency:dispatched", {
+  emergencyId: "emg123",
+  ambulance: {
+    /* Full ambulance object */
+  },
   destinationHospitalId: hospitalId,
-  eta: '2024-01-15T10:30:00Z'
+  eta: "2024-01-15T10:30:00Z",
 });
 
 // Ambulance arrived
-io.to(`hospital:${hospitalId}`).emit('ambulance:arrived', {
-  ambulanceId: 'amb123',
+io.to(`hospital:${hospitalId}`).emit("ambulance:arrived", {
+  ambulanceId: "amb123",
   hospitalId: hospitalId,
-  timestamp: '2024-01-15T10:30:00Z'
+  timestamp: "2024-01-15T10:30:00Z",
 });
 ```
 
@@ -230,6 +242,7 @@ db.ambulances.createIndex({ "currentLocation": "2dsphere" });
 ## 🎨 Design System
 
 ### Dark Theme Map Styles
+
 - Background: Dark blue-gray (`#242f3e`)
 - Roads: Light gray (`#38414e`)
 - Water: Deep blue (`#17263c`)
@@ -237,6 +250,7 @@ db.ambulances.createIndex({ "currentLocation": "2dsphere" });
 - Highways: Tan (`#746855`)
 
 ### Component Styling
+
 - **Statistics Cards**: Glassmorphic dark with gradient borders
   - Purple for Total Ambulances
   - Blue for En Route
@@ -249,13 +263,14 @@ db.ambulances.createIndex({ "currentLocation": "2dsphere" });
   - Yellow: At Scene
   - Purple: Returning
   - Red: Out of Service
-- **Priority Badges**: 
+- **Priority Badges**:
   - Red: Critical
   - Orange: High
   - Yellow: Medium
   - Green: Low
 
 ### Markers
+
 - **Hospital**: Purple circle (scale 12) with white border
 - **Own Ambulances**: Blue pin with rotation (heading-based)
 - **Incoming Ambulances**: Green pin with rotation
@@ -263,6 +278,7 @@ db.ambulances.createIndex({ "currentLocation": "2dsphere" });
 ## 📦 Dependencies
 
 Already Installed:
+
 - ✅ `@react-google-maps/api` - Google Maps React wrapper
 - ✅ `@googlemaps/js-api-loader` - Maps API loader
 - ✅ `socket.io-client` - Real-time WebSocket
@@ -272,6 +288,7 @@ Already Installed:
 ## 🚀 How to Test (Once Backend is Ready)
 
 1. **Start the hospital dashboard**:
+
    ```bash
    cd apps/hospital-dashboard
    npm run dev
@@ -327,6 +344,7 @@ Already Installed:
 ## ⚠️ Known Issues
 
 ### Non-Blocking ESLint Warnings:
+
 1. Import order warnings (framer-motion before react)
 2. Form label warnings in other components
 3. Unused variable warnings in other components
@@ -334,6 +352,7 @@ Already Installed:
 These are cosmetic and don't affect functionality.
 
 ### Blocking Issues (Need Backend):
+
 1. ❌ Backend endpoints not created yet
 2. ❌ Socket.IO server not configured for hospital rooms
 3. ❌ Database schema not updated with geospatial fields
@@ -389,13 +408,15 @@ These are cosmetic and don't affect functionality.
 
 ## 📊 Estimated Timeline
 
-**Frontend (COMPLETE)**: 
+**Frontend (COMPLETE)**:
+
 - Components: 4 hours ✅
 - Services: 2 hours ✅
 - Integration: 1 hour ✅
 - **Total**: 7 hours ✅
 
 **Backend (REMAINING)**:
+
 - API Endpoints: 4 hours
 - Database Updates: 1 hour
 - Socket.IO Setup: 3 hours
@@ -417,6 +438,7 @@ These are cosmetic and don't affect functionality.
 ## 📱 Mobile Responsiveness
 
 Current implementation is **desktop-first**. For mobile:
+
 - Statistics cards should stack vertically
 - Info panel should slide from bottom (not right)
 - Map controls should be touch-friendly
@@ -439,6 +461,7 @@ Current implementation is **desktop-first**. For mobile:
 ❌ **Backend Implementation Pending**
 
 The hospital dashboard now has a fully functional live tracking UI with:
+
 - Beautiful dark-themed Google Maps
 - Real-time statistics
 - Ambulance info panel

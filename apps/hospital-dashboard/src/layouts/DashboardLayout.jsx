@@ -71,10 +71,7 @@ const DashboardLayout = () => {
           </LayoutV2>
         }
       />
-      <Route
-        path="/tracking"
-        element={<LiveTracking />}
-      />
+      <Route path="/tracking" element={<LiveTracking />} />
       <Route
         path="/reports"
         element={

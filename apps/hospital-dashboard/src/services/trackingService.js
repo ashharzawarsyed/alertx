@@ -12,13 +12,16 @@ class TrackingService {
 
   // Initialize Socket.IO connection
   connect(hospitalId, token) {
-    const socketUrl = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL || "http://localhost:5001";
-    
+    const socketUrl =
+      import.meta.env.VITE_SOCKET_URL ||
+      import.meta.env.VITE_API_URL ||
+      "http://localhost:5001";
+
     this.socket = io(socketUrl, {
-      auth: { 
-        token, 
-        hospitalId, 
-        role: "hospital" 
+      auth: {
+        token,
+        hospitalId,
+        role: "hospital",
       },
       reconnection: true,
       reconnectionAttempts: this.maxReconnectAttempts,
@@ -52,7 +55,9 @@ class TrackingService {
   // Fetch initial ambulance tracking data
   async getAmbulances(hospitalId) {
     try {
-      const response = await api.get(`/hospitals/${hospitalId}/ambulances/tracking`);
+      const response = await api.get(
+        `/hospitals/${hospitalId}/ambulances/tracking`
+      );
       return response.data;
     } catch (error) {
       console.error("Error fetching ambulances:", error);

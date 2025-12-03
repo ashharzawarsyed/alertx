@@ -5,6 +5,7 @@
 All **frontend** code for Priority 1 (Live Map Tracking) is complete and ready to use!
 
 ### Files Created:
+
 1. ✅ `src/pages/LiveTracking.jsx` - Main map component
 2. ✅ `src/components/AmbulanceInfoPanel.jsx` - Info sidebar
 3. ✅ `src/services/trackingService.js` - Real-time data service
@@ -14,6 +15,7 @@ All **frontend** code for Priority 1 (Live Map Tracking) is complete and ready t
 7. ✅ `src/components/SidebarNew.jsx` - Navigation added
 
 ### Dependencies Installed:
+
 - ✅ `@react-google-maps/api` - Maps
 - ✅ `socket.io-client` - Real-time
 - ✅ `framer-motion` - Animations
@@ -75,28 +77,34 @@ PUT /api/v1/ambulances/:id/arrived
 
 ```javascript
 // Hospital joins room
-socket.on('hospital:join', (hospitalId) => {
+socket.on("hospital:join", (hospitalId) => {
   socket.join(`hospital:${hospitalId}`);
 });
 
 // Emit location updates
-io.to(`hospital:${hospitalId}`).emit('ambulance:location', {
-  ambulanceId, location, heading, speed
+io.to(`hospital:${hospitalId}`).emit("ambulance:location", {
+  ambulanceId,
+  location,
+  heading,
+  speed,
 });
 
 // Emit status updates
-io.to(`hospital:${hospitalId}`).emit('ambulance:status', {
-  ambulanceId, status
+io.to(`hospital:${hospitalId}`).emit("ambulance:status", {
+  ambulanceId,
+  status,
 });
 
 // Emit new dispatch
-io.to(`hospital:${hospitalId}`).emit('emergency:dispatched', {
-  ambulance, destinationHospitalId
+io.to(`hospital:${hospitalId}`).emit("emergency:dispatched", {
+  ambulance,
+  destinationHospitalId,
 });
 
 // Emit arrival
-io.to(`hospital:${hospitalId}`).emit('ambulance:arrived', {
-  ambulanceId, hospitalId
+io.to(`hospital:${hospitalId}`).emit("ambulance:arrived", {
+  ambulanceId,
+  hospitalId,
 });
 ```
 
@@ -108,39 +116,39 @@ For quick testing, you can modify `LiveTracking.jsx` to use mock data:
 // Add this after line 121 in LiveTracking.jsx
 const mockAmbulances = [
   {
-    _id: 'amb1',
-    vehicleNumber: 'AMB-001',
-    status: 'en-route',
+    _id: "amb1",
+    vehicleNumber: "AMB-001",
+    status: "en-route",
     currentLocation: {
-      type: 'Point',
-      coordinates: [-74.006, 40.7128] // [lng, lat]
+      type: "Point",
+      coordinates: [-74.006, 40.7128], // [lng, lat]
     },
     heading: 45,
     speed: 60,
     driver: {
-      name: 'John Doe',
-      phone: '+1234567890'
+      name: "John Doe",
+      phone: "+1234567890",
     },
     currentEmergency: {
-      priority: 'critical',
+      priority: "critical",
       eta: new Date(Date.now() + 10 * 60000).toISOString(),
-      patient: { age: 45, gender: 'male' },
+      patient: { age: 45, gender: "male" },
       vitals: {
         heartRate: 85,
-        bloodPressure: '120/80',
-        oxygenLevel: 98
-      }
-    }
-  }
+        bloodPressure: "120/80",
+        oxygenLevel: 98,
+      },
+    },
+  },
 ];
 
 const mockHospital = {
-  _id: 'hosp123',
-  name: 'City General Hospital',
+  _id: "hosp123",
+  name: "City General Hospital",
   coordinates: {
     latitude: 40.7128,
-    longitude: -74.0060
-  }
+    longitude: -74.006,
+  },
 };
 
 // Replace the API call on line 137
@@ -148,32 +156,34 @@ const mockHospital = {
 // With:
 const data = {
   ownAmbulances: mockAmbulances,
-  incomingAmbulances: []
+  incomingAmbulances: [],
 };
 ```
 
 ## 📊 Current Status
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| LiveTracking.jsx | ✅ Complete | 515 lines, full functionality |
-| AmbulanceInfoPanel.jsx | ✅ Complete | 304 lines, all features |
-| trackingService.js | ✅ Complete | Socket.IO + API ready |
-| api.js | ✅ Complete | Axios with interceptors |
-| Navigation | ✅ Complete | Route + sidebar added |
-| .env Config | ✅ Complete | Google Maps key set |
-| Backend APIs | ❌ Pending | Needs implementation |
-| Socket.IO Server | ❌ Pending | Needs configuration |
-| Database Schema | ❌ Pending | Add geolocation fields |
+| Component              | Status      | Notes                         |
+| ---------------------- | ----------- | ----------------------------- |
+| LiveTracking.jsx       | ✅ Complete | 515 lines, full functionality |
+| AmbulanceInfoPanel.jsx | ✅ Complete | 304 lines, all features       |
+| trackingService.js     | ✅ Complete | Socket.IO + API ready         |
+| api.js                 | ✅ Complete | Axios with interceptors       |
+| Navigation             | ✅ Complete | Route + sidebar added         |
+| .env Config            | ✅ Complete | Google Maps key set           |
+| Backend APIs           | ❌ Pending  | Needs implementation          |
+| Socket.IO Server       | ❌ Pending  | Needs configuration           |
+| Database Schema        | ❌ Pending  | Add geolocation fields        |
 
 ## 🐛 Known Issues
 
 ### Non-Blocking (ESLint Warnings):
+
 - Import order warnings (cosmetic)
 - Unused variable warnings (will be used when backend connects)
 - Form label accessibility warnings (in other files)
 
 ### Blocking (Need Backend):
+
 - No real ambulance data
 - Socket.IO connection fails (server not running)
 - API calls return 404
@@ -182,6 +192,7 @@ const data = {
 ## 🎯 Next Actions
 
 1. **Start Backend Server** (if not running):
+
    ```bash
    cd /c/Users/ashha/OneDrive/Desktop/alertx/apps/backend
    npm start
@@ -208,21 +219,25 @@ const data = {
 ## 🆘 Troubleshooting
 
 ### Map doesn't load:
+
 - Check Google Maps API key in `.env`
 - Check browser console for errors
 - Verify internet connection
 
 ### Connection status shows "Disconnected":
+
 - Backend Socket.IO server not running
 - Check `VITE_SOCKET_URL` in `.env`
 - Verify backend is running on port 5001
 
 ### No ambulances appear:
+
 - Backend endpoints not implemented
 - Check Network tab in DevTools
 - Verify API returns data
 
 ### Markers don't update:
+
 - Socket.IO not configured on backend
 - Hospital room not joined
 - Events not emitted from backend
