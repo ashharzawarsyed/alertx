@@ -114,9 +114,8 @@ export default function ExploreScreen() {
     try {
       const response = await exploreService.getNearbyHospitals(lat, lng, 50);
       if (response.success && response.data) {
-        const hospitalsArray = Array.isArray(response.data)
-          ? response.data
-          : (response.data as any).hospitals || [];
+        // Backend returns data.hospitals (nested structure)
+        const hospitalsArray = (response.data as any).hospitals || [];
         
         if (hospitalsArray.length > 0) {
           setHospitals(hospitalsArray);
@@ -130,9 +129,7 @@ export default function ExploreScreen() {
             50 // 50km radius to cover Islamabad
           );
           if (islamabadResponse.success && islamabadResponse.data) {
-            const islamabadHospitals = Array.isArray(islamabadResponse.data)
-              ? islamabadResponse.data
-              : (islamabadResponse.data as any).hospitals || [];
+            const islamabadHospitals = (islamabadResponse.data as any).hospitals || [];
             setHospitals(islamabadHospitals);
             console.log(`🏥 Showing ${islamabadHospitals.length} Islamabad hospitals as default`);
           } else {
