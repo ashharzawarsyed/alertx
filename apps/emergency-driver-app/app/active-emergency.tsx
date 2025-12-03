@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,12 +6,18 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
+  Dimensions,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEmergencyStore } from '@/src/store/emergencyStore';
 import emergencyService from '@/src/services/emergencyService';
 import locationService, { LocationData } from '@/src/services/locationService';
 import socketService from '@/src/services/socketService';
+import CrossPlatformMap from '@/components/CrossPlatformMap';
+import { generatePolylineCode, PolylineSegment } from '@/src/components/maps/MapPolyline';
+
+const { width } = Dimensions.get('window');
 
 type TripStatus = 'en_route' | 'arrived' | 'transporting' | 'completed';
 
@@ -30,9 +36,16 @@ export default function ActiveEmergencyScreen() {
       return;
     }
 
+    // Start continuous location tracking with socket emission
+    // This runs ONLY when there's an active emergency
     startLocationTracking();
 
     return () => {
+      // Stop location tracking and socket emission when:
+      // 1. Trip is completed
+      // 2. Emergency is cancelled
+      // 3. Component unmounts
+      console.log('🛑 Stopping location tracking - emergency ended');
       locationService.stopTracking();
     };
   }, [activeEmergency]);
@@ -122,6 +135,8 @@ export default function ActiveEmergencyScreen() {
         addToHistory(activeEmergency);
         clearActiveEmergency();
         
+        // Location tracking stops automatically via useEffect cleanup
+        // when component unmounts on navigation back to home
         Alert.alert('Trip Completed', 'Great job! Ready for next emergency.', [
           { text: 'OK', onPress: () => router.replace('/(tabs)') },
         ]);
@@ -145,7 +160,8 @@ export default function ActiveEmergencyScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <Text style={styles.backButtonText}>← Back</Text>
+          <Ionicons name="arrow-back" size={24} color="#fff" />
+          <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Active Emergency</Text>
         <View style={styles.placeholder} />
@@ -160,6 +176,93 @@ export default function ActiveEmergencyScreen() {
             {tripStatus === 'transporting' && '🏥 Transporting to Hospital'}
             {tripStatus === 'completed' && '✅ Trip Completed'}
           </Text>
+        </View>
+
+        {/* Map with Route */}
+        <View style={styles.mapCard}>
+          <Text style={styles.cardTitle}>📍 Live Navigation</Text>
+          <View style={styles.mapContainer}>
+            <CrossPlatformMap
+              initialRegion={{
+                latitude: currentLocation?.lat || activeEmergency.location.lat,
+                longitude: currentLocation?.lng || activeEmergency.location.lng,
+                latitudeDelta: 0.05,
+                longitudeDelta: 0.05,
+              }}
+              markers={[
+                {
+                  latitude: activeEmergency.location.lat,
+                  longitude: activeEmergency.location.lng,
+                  title: 'Patient Location',
+                  description: activeEmergency.patient.name,
+                  color: '#dc2626',
+                },
+                ...(currentLocation ? [{
+                  latitude: currentLocation.lat,
+                  longitude: currentLocation.lng,
+                  title: 'Your Location',
+                  description: '🚑 Ambulance',
+                  color: '#10b981',
+                }] : []),
+                ...(activeEmergency.assignedHospital ? [{
+                  latitude: (activeEmergency.assignedHospital as any).location?.lat || 33.7077,
+                  longitude: (activeEmergency.assignedHospital as any).location?.lng || 73.0533,
+                  title: activeEmergency.assignedHospital.name,
+                  description: '🏥 Hospital',
+                  color: '#3b82f6',
+                }] : []),
+              ]}
+              polylineCode={useMemo(() => {
+                if (!currentLocation) return '';
+                
+                const segments: PolylineSegment[] = [];
+                
+                // Route to patient (green solid line)
+                if (tripStatus === 'en_route' || tripStatus === 'arrived') {
+                  segments.push({
+                    coordinates: [
+                      { lat: currentLocation.lat, lng: currentLocation.lng },
+                      { lat: activeEmergency.location.lat, lng: activeEmergency.location.lng },
+                    ],
+                    color: '#10b981',
+                    weight: 4,
+                    opacity: 0.8,
+                  });
+                }
+                
+                // Route to hospital (blue dashed line)
+                if (activeEmergency.assignedHospital && (tripStatus === 'transporting' || tripStatus === 'completed')) {
+                  const hospitalLat = (activeEmergency.assignedHospital as any).location?.lat || 33.7077;
+                  const hospitalLng = (activeEmergency.assignedHospital as any).location?.lng || 73.0533;
+                  
+                  segments.push({
+                    coordinates: [
+                      { lat: currentLocation.lat, lng: currentLocation.lng },
+                      { lat: hospitalLat, lng: hospitalLng },
+                    ],
+                    color: '#3b82f6',
+                    weight: 4,
+                    opacity: 0.8,
+                    dashArray: '10, 5',
+                  });
+                }
+                
+                return generatePolylineCode(segments);
+              }, [currentLocation, tripStatus, activeEmergency])}
+            />
+          </View>
+          <View style={styles.mapStats}>
+            <View style={styles.statItem}>
+              <Ionicons name="navigate" size={20} color="#10b981" />
+              <Text style={styles.statLabel}>Distance</Text>
+              <Text style={styles.statValue}>{locationService.formatDistance(distance)}</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Ionicons name="time" size={20} color="#f59e0b" />
+              <Text style={styles.statLabel}>ETA</Text>
+              <Text style={styles.statValue}>{eta} min</Text>
+            </View>
+          </View>
         </View>
 
         {/* Patient Info */}
@@ -300,28 +403,31 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
   },
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: '#dc2626',
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#b91c1c',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 8,
+    gap: 8,
   },
   backButtonText: {
     fontSize: 16,
-    color: '#dc2626',
+    color: '#fff',
     fontWeight: '600',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1f2937',
+    color: '#fff',
   },
   placeholder: {
     width: 50,
@@ -361,6 +467,50 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e5e7eb',
+  },
+  mapCard: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  mapContainer: {
+    height: 300,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  mapStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 4,
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginTop: 2,
   },
   cardTitle: {
     fontSize: 16,

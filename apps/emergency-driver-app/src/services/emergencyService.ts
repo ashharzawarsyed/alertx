@@ -202,6 +202,38 @@ class EmergencyService {
   }
 
   /**
+   * Reject/Decline emergency (forwards to next driver)
+   */
+  async rejectEmergency(
+    emergencyId: string,
+    reason?: string
+  ): Promise<EmergencyResponse> {
+    try {
+      console.log('🚫 Rejecting emergency:', emergencyId);
+
+      const response = await this.api.post<EmergencyResponse>(
+        `/emergencies/${emergencyId}/reject`,
+        { reason }
+      );
+
+      console.log('✅ Emergency rejected');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Reject emergency error:', error);
+
+      if (error.response?.data) {
+        return error.response.data;
+      }
+
+      return {
+        success: false,
+        message: error.message || 'Failed to reject emergency',
+        errors: [error.message || 'Network error'],
+      };
+    }
+  }
+
+  /**
    * Update emergency status
    */
   async updateEmergencyStatus(

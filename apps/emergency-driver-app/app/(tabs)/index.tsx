@@ -38,6 +38,7 @@ export default function HomeScreen() {
   );
   const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const locationIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     loadEmergencies();
@@ -45,16 +46,30 @@ export default function HomeScreen() {
     requestLocationPermission();
     fetchDriverLocation();
 
+    // Start basic location tracking (updates map only, no socket emission)
+    const locationInterval = startBasicLocationTracking();
+    locationIntervalRef.current = locationInterval;
+
     return () => {
       socketService.offNewEmergency();
+      socketService.offEmergencyCancelled();
+      if (locationIntervalRef.current) clearInterval(locationIntervalRef.current);
     };
   }, []);
 
   const fetchDriverLocation = async () => {
     try {
+      console.log('📍 Requesting location permissions...');
       const { status } = await Location.requestForegroundPermissionsAsync();
+      
       if (status !== 'granted') {
+        console.warn('⚠️ Location permissions denied, using default Islamabad location');
         setLocationError('Location permission denied');
+        // Use default Islamabad location
+        setDriverLocation({
+          lat: 33.6844,
+          lng: 73.0479,
+        });
         return;
       }
 
@@ -70,7 +85,43 @@ export default function HomeScreen() {
     } catch (error) {
       console.error('Failed to fetch driver location:', error);
       setLocationError('Failed to get location');
+      // Fallback to default Islamabad location on error
+      setDriverLocation({
+        lat: 33.6844,
+        lng: 73.0479,
+      });
     }
+  };
+
+  const startBasicLocationTracking = () => {
+    console.log('🎯 Starting basic location tracking (map updates only)...');
+    
+    const interval = setInterval(async () => {
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        
+        if (status !== 'granted') {
+          return;
+        }
+
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+
+        // Update local state for map display
+        setDriverLocation({
+          lat: location.coords.latitude,
+          lng: location.coords.longitude,
+        });
+
+        // Note: Location is NOT emitted to socket here
+        // Only emit when there's an active emergency (see active-emergency.tsx)
+      } catch (error) {
+        console.error('Location tracking error:', error);
+      }
+    }, 10000); // Update every 10 seconds (less frequent since no socket emission)
+
+    return interval;
   };
 
   const requestLocationPermission = async () => {
@@ -112,6 +163,18 @@ export default function HomeScreen() {
         [{ text: 'View', onPress: () => {} }]
       );
     });
+
+    // Listen for patient cancellations
+    socketService.onEmergencyCancelled((data) => {
+      console.log('❌ Emergency cancelled by patient:', data);
+      removeIncomingEmergency(data.emergencyId);
+      
+      Alert.alert(
+        'Emergency Cancelled',
+        data.message || 'The patient has cancelled this emergency request.',
+        [{ text: 'OK' }]
+      );
+    });
   };
 
   const handleRefresh = async () => {
@@ -139,6 +202,7 @@ export default function HomeScreen() {
                 socketService.notifyEmergencyAccepted(emergency._id);
 
                 // Navigate to active emergency screen
+                // Note: Continuous location emission to socket starts in active-emergency.tsx
                 router.push('/active-emergency');
               } else {
                 Alert.alert('Error', result.message || 'Failed to accept emergency');
@@ -149,6 +213,40 @@ export default function HomeScreen() {
       );
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to accept emergency');
+    }
+  };
+
+  const handleRejectEmergency = async (emergency: Emergency) => {
+    try {
+      Alert.alert(
+        'Decline Emergency',
+        'Are you sure you want to decline this emergency? It will be forwarded to another driver.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Decline',
+            style: 'destructive',
+            onPress: async () => {
+              const result = await emergencyService.rejectEmergency(
+                emergency._id,
+                'Driver unavailable'
+              );
+
+              if (result.success) {
+                removeIncomingEmergency(emergency._id);
+                Alert.alert(
+                  'Emergency Declined',
+                  result.message || 'Emergency forwarded to another driver'
+                );
+              } else {
+                Alert.alert('Error', result.message || 'Failed to decline emergency');
+              }
+            },
+          },
+        ]
+      );
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to decline emergency');
     }
   };
 
@@ -240,12 +338,20 @@ export default function HomeScreen() {
         </View>
       )}
 
-      <TouchableOpacity
-        style={styles.acceptButton}
-        onPress={() => handleAcceptEmergency(item)}
-      >
-        <Text style={styles.acceptButtonText}>Accept Emergency</Text>
-      </TouchableOpacity>
+      <View style={styles.actionButtons}>
+        <TouchableOpacity
+          style={styles.acceptButton}
+          onPress={() => handleAcceptEmergency(item)}
+        >
+          <Text style={styles.acceptButtonText}>Accept</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.declineButton}
+          onPress={() => handleRejectEmergency(item)}
+        >
+          <Text style={styles.declineButtonText}>Decline</Text>
+        </TouchableOpacity>
+      </View>
     </TouchableOpacity>
   );
 
@@ -282,44 +388,42 @@ export default function HomeScreen() {
       </View>
 
       {/* Driver Location Map */}
-      {driverLocation && (
-        <View style={styles.mapContainer}>
-          <View style={styles.mapHeader}>
-            <Text style={styles.mapTitle}>📍 Your Location</Text>
-            {incomingEmergencies.length > 0 && (
-              <Text style={styles.emergencyCount}>
-                {incomingEmergencies.length} active request{incomingEmergencies.length !== 1 ? 's' : ''}
-              </Text>
-            )}
-          </View>
-          <View style={styles.mapWrapper}>
-            <CrossPlatformMap
-              initialRegion={{
-                latitude: driverLocation.lat,
-                longitude: driverLocation.lng,
-                latitudeDelta: 0.05,
-                longitudeDelta: 0.05,
-              }}
-              markers={[
-                {
-                  latitude: driverLocation.lat,
-                  longitude: driverLocation.lng,
-                  title: "Your Location",
-                  description: "Driver position",
-                  color: "#10b981"
-                },
-                ...incomingEmergencies.map((emergency, index) => ({
-                  latitude: emergency.location.lat,
-                  longitude: emergency.location.lng,
-                  title: `Emergency ${index + 1}`,
-                  description: emergency.severityLevel,
-                  color: emergency.severityLevel === 'critical' ? '#ef4444' : '#f59e0b'
-                }))
-              ]}
-            />
-          </View>
+      <View style={styles.mapContainer}>
+        <View style={styles.mapHeader}>
+          <Text style={styles.mapTitle}>📍 {driverLocation ? 'Your Location' : 'Default Location (Islamabad)'}</Text>
+          {incomingEmergencies.length > 0 && (
+            <Text style={styles.emergencyCount}>
+              {incomingEmergencies.length} active request{incomingEmergencies.length !== 1 ? 's' : ''}
+            </Text>
+          )}
         </View>
-      )}
+        <View style={styles.mapWrapper}>
+          <CrossPlatformMap
+            initialRegion={{
+              latitude: driverLocation?.lat || 33.6844,
+              longitude: driverLocation?.lng || 73.0479,
+              latitudeDelta: 0.05,
+              longitudeDelta: 0.05,
+            }}
+            markers={[
+              {
+                latitude: driverLocation?.lat || 33.6844,
+                longitude: driverLocation?.lng || 73.0479,
+                title: driverLocation ? "Your Location" : "Default Location",
+                description: driverLocation ? "Driver position" : "Islamabad, Pakistan",
+                color: "#10b981"
+              },
+              ...incomingEmergencies.map((emergency, index) => ({
+                latitude: emergency.location.lat,
+                longitude: emergency.location.lng,
+                title: `Emergency ${index + 1}`,
+                description: emergency.severityLevel,
+                color: emergency.severityLevel === 'critical' ? '#ef4444' : '#f59e0b'
+              }))
+            ]}
+          />
+        </View>
+      </View>
 
       {/* Emergency List */}
       {incomingEmergencies.length === 0 ? (
@@ -491,7 +595,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#075985',
   },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
   acceptButton: {
+    flex: 1,
     backgroundColor: '#dc2626',
     paddingVertical: 12,
     borderRadius: 8,
@@ -499,6 +608,18 @@ const styles = StyleSheet.create({
   },
   acceptButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  declineButton: {
+    flex: 1,
+    backgroundColor: '#e5e7eb',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  declineButtonText: {
+    color: '#1f2937',
     fontSize: 16,
     fontWeight: '600',
   },

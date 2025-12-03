@@ -978,8 +978,7 @@ export const resetPassword = asyncHandler(async (req, res) => {
   }
 
   // Find user
-  const user = await User.findOne({ email: email.toLowerCase() })
-    .select('+resetPasswordCode +resetPasswordExpiry');
+  const user = await User.findOne({ email: email.toLowerCase() });
 
   if (!user) {
     return sendResponse(
@@ -989,8 +988,22 @@ export const resetPassword = asyncHandler(async (req, res) => {
     );
   }
 
-  // Verify reset code
-  if (user.resetPasswordCode !== code) {
+  // Verify reset code (trim both to handle whitespace)
+  const submittedCode = code.toString().trim();
+  const storedCode = user.passwordResetToken ? user.passwordResetToken.toString().trim() : null;
+  
+  console.log(`🔍 Password reset verification for ${email}:`, {
+    submittedCode,
+    storedCode,
+    hasStoredCode: !!storedCode,
+    codesMatch: submittedCode === storedCode,
+    expiresAt: user.passwordResetExpires ? new Date(user.passwordResetExpires).toISOString() : 'not set',
+    now: new Date().toISOString(),
+    isExpired: user.passwordResetExpires ? Date.now() > user.passwordResetExpires : true
+  });
+
+  if (!storedCode || storedCode !== submittedCode) {
+    console.error(`❌ Code mismatch: submitted="${submittedCode}", stored="${storedCode}"`);
     return sendResponse(
       res,
       RESPONSE_CODES.BAD_REQUEST,
@@ -999,7 +1012,7 @@ export const resetPassword = asyncHandler(async (req, res) => {
   }
 
   // Check if code expired
-  if (Date.now() > user.resetPasswordExpiry) {
+  if (!user.passwordResetExpires || Date.now() > user.passwordResetExpires) {
     return sendResponse(
       res,
       RESPONSE_CODES.BAD_REQUEST,
@@ -1007,10 +1020,17 @@ export const resetPassword = asyncHandler(async (req, res) => {
     );
   }
 
-  // Update password
+  // Update password and reactivate account
   user.password = newPassword; // Will be hashed by pre-save hook
-  user.resetPasswordCode = undefined;
-  user.resetPasswordExpiry = undefined;
+  user.passwordResetToken = undefined;
+  user.passwordResetExpires = undefined;
+  
+  // Reactivate account if it was deactivated (user verified email access)
+  if (!user.isActive) {
+    console.log(`🔓 Reactivating account for ${email}`);
+    user.isActive = true;
+  }
+  
   await user.save();
 
   console.log(`✅ Password reset successful for ${email}`);

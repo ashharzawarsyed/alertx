@@ -50,6 +50,7 @@ export default function HomeScreen() {
   >([]);
   const [refreshing, setRefreshing] = useState(false);
   const lastCreatedEmergencyId = useRef<string | null>(null);
+  const isDispatching = useRef<boolean>(false); // Prevent duplicate dispatch calls
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [nearbyHospitals, setNearbyHospitals] = useState<any[]>([]);
@@ -100,6 +101,27 @@ export default function HomeScreen() {
         Alert.alert(
           'Emergency Cancelled',
           data.reason || 'Your emergency has been cancelled. You can now request a new emergency.',
+          [{ text: 'OK' }]
+        );
+      }
+    });
+
+    // Listen for emergency being forwarded to another driver
+    socketRef.current.on('emergency:forwarded', (data: { 
+      emergencyId: string;
+      previousDriver: string;
+      newDriver: string;
+      reason: string;
+      message: string;
+    }) => {
+      console.log('🔄 Emergency forwarded:', data);
+      
+      if (activeEmergency?._id === data.emergencyId) {
+        Alert.alert(
+          '🔄 Emergency Forwarded',
+          `Previous driver (${data.previousDriver}) was unavailable.\n\n` +
+          `Your emergency has been forwarded to: ${data.newDriver}\n\n` +
+          `Reason: ${data.reason}`,
           [{ text: 'OK' }]
         );
       }
@@ -242,8 +264,30 @@ export default function HomeScreen() {
             10 // 10km radius
           );
           if (hospitalResponse.success && hospitalResponse.data) {
-            setNearbyHospitals(hospitalResponse.data.slice(0, 5)); // Show max 5 hospitals
-            console.log(`🏥 Found ${hospitalResponse.data.length} nearby hospitals`);
+            // Handle both array and object responses
+            const hospitalsArray = Array.isArray(hospitalResponse.data) 
+              ? hospitalResponse.data 
+              : (hospitalResponse.data as any).hospitals || [];
+            
+            if (hospitalsArray.length > 0) {
+              setNearbyHospitals(hospitalsArray.slice(0, 5)); // Show max 5 hospitals
+              console.log(`🏥 Found ${hospitalsArray.length} nearby hospitals`);
+            } else {
+              // Fallback to Islamabad hospitals if no nearby hospitals found
+              console.log('⚠️ No nearby hospitals, fetching Islamabad defaults...');
+              const islamabadResponse = await exploreService.getNearbyHospitals(
+                33.6844, // Islamabad F-7 center
+                73.0479,
+                50 // 50km radius to cover Islamabad
+              );
+              if (islamabadResponse.success && islamabadResponse.data) {
+                const islamabadHospitals = Array.isArray(islamabadResponse.data)
+                  ? islamabadResponse.data
+                  : (islamabadResponse.data as any).hospitals || [];
+                setNearbyHospitals(islamabadHospitals.slice(0, 5));
+                console.log(`🏥 Showing ${islamabadHospitals.length} Islamabad hospitals as default`);
+              }
+            }
           }
         } catch (error) {
           console.error("❌ Error fetching hospitals:", error);
@@ -276,11 +320,54 @@ export default function HomeScreen() {
 
   // Handle symptom analysis completion
   const handleAnalysisComplete = async (analysis: TriageResult) => {
+    // Prevent duplicate calls
+    if (isDispatching.current) {
+      console.log('⚠️ Already dispatching, ignoring duplicate call');
+      return;
+    }
+
     console.log('🔬 Analysis received:', analysis);
     setTriageResult(analysis);
     setShowSymptomModal(false);
 
+    // Set dispatching flag
+    isDispatching.current = true;
+
     try {
+      // Check for active emergency BEFORE attempting dispatch
+      console.log('🔍 Checking for active emergencies...');
+      const checkResponse = await emergencyService.getEmergencies(1, 50);
+      if (checkResponse.success && checkResponse.data) {
+        const activeEmergencies = checkResponse.data.emergencies.filter(
+          (e: Emergency) => ['pending', 'accepted', 'in_progress'].includes(e.status)
+        );
+        
+        if (activeEmergencies.length > 0) {
+          const activeEmerg = activeEmergencies[0];
+          setActiveEmergency(activeEmerg);
+          console.log('⚠️ Found active emergency:', activeEmerg._id);
+          
+          Alert.alert(
+            "Active Emergency Detected",
+            `You already have an emergency in progress (Status: ${activeEmerg.status}).\n\nPlease wait for the current emergency to be resolved before creating a new one.`,
+            [
+              {
+                text: "Track Current Emergency",
+                onPress: () => {
+                  router.push({
+                    pathname: "/emergency/tracking" as any,
+                    params: { emergencyId: activeEmerg._id },
+                  });
+                },
+              },
+              { text: "OK", style: "cancel" },
+            ]
+          );
+          isDispatching.current = false; // Reset flag
+          return;
+        }
+      }
+
       // Use actual user location or fallback
       const location = userLocation || {
         lat: 33.6522224, // Fallback: Islamabad coordinates
@@ -291,22 +378,14 @@ export default function HomeScreen() {
         console.log("⚠️ Using fallback location - GPS not available");
       }
 
-      // Dispatch ambulance based on AI analysis
-      console.log('🚑 Dispatching ambulance...');
-      const ambulance = await ambulanceDispatcher.dispatchAmbulance(
-        analysis,
-        location
-      );
-
-      setDispatchedAmbulance(ambulance);
-
       // Get actual symptoms from analysis
       const actualSymptoms = analysis.detectedSymptoms?.map((s: any) => s.keyword) || [];
       const symptomsText = actualSymptoms.length > 0 
         ? actualSymptoms.join(', ')
         : `${analysis.emergencyType} emergency`;
 
-      // Trigger emergency in backend with actual symptoms
+      // Dispatch ambulance via backend (this handles everything)
+      console.log('🚑 Dispatching intelligent ambulance...');
       const response = await emergencyService.dispatchIntelligentAmbulance(
         analysis,
         location,
@@ -336,11 +415,34 @@ export default function HomeScreen() {
               { text: "OK", style: "cancel" },
             ]
           );
+          isDispatching.current = false; // Reset flag
+          return;
+        }
+
+        // Handle insufficient permissions (wrong account type)
+        if (response.message?.includes('Insufficient permissions') || response.message?.includes('Authentication required')) {
+          Alert.alert(
+            "Wrong Account Type",
+            "You are using a driver's account to login to the patient app. Please sign out and login with a patient account, or create a new patient account.",
+            [
+              {
+                text: "Sign Out",
+                onPress: () => {
+                  useAuthStore.getState().signOut();
+                  router.replace('/auth/signin');
+                },
+                style: "destructive"
+              },
+              { text: "Cancel", style: "cancel" },
+            ]
+          );
+          isDispatching.current = false; // Reset flag
           return;
         }
         
         // Other errors
         Alert.alert('Error', response.message || 'Failed to dispatch ambulance. Please try again.');
+        isDispatching.current = false; // Reset flag
         return;
       }
 
@@ -354,6 +456,7 @@ export default function HomeScreen() {
         
         // Build alert message - driver will be assigned when they accept
         const driverInfo = response.data.ambulance?.driver;
+        const hospitalInfo = response.data.emergency.assignedHospital;
         let alertMessage = `Emergency request sent successfully!\n`;
         
         if (driverInfo) {
@@ -364,7 +467,12 @@ export default function HomeScreen() {
           alertMessage += `\n⏳ Please wait for driver acceptance`;
         }
         
-        alertMessage += `\n\n🏥 Severity: ${analysis.severity}`;
+        if (hospitalInfo) {
+          alertMessage += `\n\n🏥 Nearest Hospital: ${hospitalInfo.name}`;
+          alertMessage += `\n📍 Address: ${hospitalInfo.address}`;
+        }
+        
+        alertMessage += `\n\n🚨 Severity: ${analysis.severity}`;
         alertMessage += `\n✅ Confidence: ${Math.round(analysis.confidence)}%`;
         alertMessage += `\n\nYou will be notified when a driver accepts your emergency.`;
 
@@ -381,10 +489,14 @@ export default function HomeScreen() {
             },
           ]
         );
+        
+        // Reset dispatching flag on success
+        isDispatching.current = false;
       }
     } catch (error) {
       console.error('❌ Dispatch failed:', error);
       Alert.alert('Error', 'Failed to dispatch ambulance. Please try again.');
+      isDispatching.current = false; // Reset flag on error
     }
   };
 
@@ -590,6 +702,7 @@ export default function HomeScreen() {
                   activeEmergency.status === 'cancelled' && styles.cancelledText
                 ]}>
                   Status: {activeEmergency.status.replace("_", " ")} • {activeEmergency.status === 'cancelled' ? 'Tap to dismiss' : 'Tap to track'}
+                  </Text>
                 <Text style={styles.activeEmergencySubtitle}>
                   Status: {activeEmergency.status.replace("_", " ")} • Tap to
                   track
@@ -657,57 +770,55 @@ export default function HomeScreen() {
         </View>
 
         {/* Location Map Preview */}
-        {userLocation && (
-          <View style={styles.mapPreview}>
-            <View style={styles.mapHeader}>
-              <Ionicons name="location" size={20} color="#EF4444" />
-              <Text style={styles.mapTitle}>Your Location</Text>
-              {nearbyHospitals.length > 0 && (
-                <Text style={styles.hospitalCount}>
-                  {nearbyHospitals.length} hospital{nearbyHospitals.length !== 1 ? 's' : ''} nearby
-                </Text>
-              )}
-            </View>
-            <View style={styles.mapWrapper}>
-              <CrossPlatformMap
-                initialRegion={{
-                  latitude: userLocation.lat,
-                  longitude: userLocation.lng,
-                  latitudeDelta: 0.05,
-                  longitudeDelta: 0.05,
-                }}
-                markers={[
-                  {
-                    latitude: userLocation.lat,
-                    longitude: userLocation.lng,
-                    title: "You are here",
-                    description: "Your current location",
-                    color: "#EF4444"
-                  },
-                  ...nearbyHospitals.map((hospital, index) => ({
-                    latitude: hospital.location.lat,
-                    longitude: hospital.location.lng,
-                    title: hospital.name,
-                    description: `${hospital.distance?.toFixed(1) || 'N/A'} km away`,
-                    color: "#3B82F6"
-                  }))
-                ]}
-              />
-            </View>
+        <View style={styles.mapPreview}>
+          <View style={styles.mapHeader}>
+            <Ionicons name="location" size={20} color="#EF4444" />
+            <Text style={styles.mapTitle}>{userLocation ? 'Your Location' : 'Default Location (Islamabad)'}</Text>
             {nearbyHospitals.length > 0 && (
-              <View style={styles.mapLegend}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: "#EF4444" }]} />
-                  <Text style={styles.legendText}>Your Location</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: "#3B82F6" }]} />
-                  <Text style={styles.legendText}>Hospitals</Text>
-                </View>
-              </View>
+              <Text style={styles.hospitalCount}>
+                {nearbyHospitals.length} hospital{nearbyHospitals.length !== 1 ? 's' : ''} nearby
+              </Text>
             )}
           </View>
-        )}
+          <View style={styles.mapWrapper}>
+            <CrossPlatformMap
+              initialRegion={{
+                latitude: userLocation?.lat || 33.6844,
+                longitude: userLocation?.lng || 73.0479,
+                latitudeDelta: 0.05,
+                longitudeDelta: 0.05,
+              }}
+              markers={[
+                {
+                  latitude: userLocation?.lat || 33.6844,
+                  longitude: userLocation?.lng || 73.0479,
+                  title: userLocation ? "You are here" : "Default Location",
+                  description: userLocation ? "Your current location" : "Islamabad, Pakistan",
+                  color: "#EF4444"
+                },
+                ...nearbyHospitals.map((hospital, index) => ({
+                  latitude: hospital.location.lat,
+                  longitude: hospital.location.lng,
+                  title: hospital.name,
+                  description: `${hospital.distance?.toFixed(1) || 'N/A'} km away`,
+                  color: "#3B82F6"
+                }))
+              ]}
+            />
+          </View>
+          {nearbyHospitals.length > 0 && (
+            <View style={styles.mapLegend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: "#EF4444" }]} />
+                <Text style={styles.legendText}>Your Location</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: "#3B82F6" }]} />
+                <Text style={styles.legendText}>Hospitals</Text>
+              </View>
+            </View>
+          )}
+        </View>
 
         {/* Info Card - Fills empty space */}
         <View style={styles.infoSection}>

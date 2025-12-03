@@ -16,6 +16,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { emergencyService, Emergency } from "../../services/emergencyService";
 import CrossPlatformMap, { Marker } from "../../components/CrossPlatformMap";
+import { 
+  useAmbulanceTracking, 
+  TrackingLocation 
+} from "../../components/maps/AmbulanceTrackingPolyline";
+import { generatePolylineCode, PolylineSegment } from "../../components/maps/MapPolyline";
+
+// Socket service will be dynamically imported when needed
+let socketService: any = null;
 
 const { width, height } = Dimensions.get("window");
 const ASPECT_RATIO = width / height;
@@ -62,8 +70,44 @@ export default function EmergencyTrackingScreen() {
   const [driverLocation, setDriverLocation] = useState<DriverLocation | null>(null);
   const [eta, setEta] = useState<string | null>(null);
   const [distance, setDistance] = useState<string | null>(null);
+  const [trackingStatus, setTrackingStatus] = useState<'en_route_to_patient' | 'transporting_to_hospital' | 'completed'>('en_route_to_patient');
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Generate tracking polylines
+  const ambulanceTracking = useAmbulanceTracking(
+    {
+      lat: driverLocation?.latitude || 0,
+      lng: driverLocation?.longitude || 0,
+    },
+    {
+      lat: emergency?.location.lat || 0,
+      lng: emergency?.location.lng || 0,
+    },
+    {
+      // Use PIMS Hospital Islamabad as default hospital location
+      lat: (emergency?.assignedHospital as any)?.location?.lat || 33.7077,
+      lng: (emergency?.assignedHospital as any)?.location?.lng || 73.0533,
+    },
+    trackingStatus
+  );
+
+  // Convert tracking segments to polyline format
+  const polylineSegments: PolylineSegment[] = React.useMemo(() => {
+    return ambulanceTracking.segments.map((segment) => ({
+      coordinates: [segment.from, segment.to],
+      color: segment.color,
+      weight: 4,
+      opacity: 1.0,
+      dashArray: segment.dashArray,
+      zIndex: segment.zIndex,
+    }));
+  }, [ambulanceTracking.segments]);
+
+  // Generate polyline code for WebView
+  const polylineCode = React.useMemo(() => {
+    return generatePolylineCode(polylineSegments);
+  }, [polylineSegments]);
 
   // Pulse animation for ambulance marker
   useEffect(() => {
@@ -119,6 +163,15 @@ export default function EmergencyTrackingScreen() {
       if (response.success && response.data) {
         const emergencyData = response.data.emergency as ExtendedEmergency;
         setEmergency(emergencyData);
+
+        // Update tracking status based on emergency status
+        if (emergencyData.status === 'completed') {
+          setTrackingStatus('completed');
+        } else if (emergencyData.status === 'in_progress' || emergencyData.pickupTime) {
+          setTrackingStatus('transporting_to_hospital');
+        } else {
+          setTrackingStatus('en_route_to_patient');
+        }
 
         // Calculate ETA if ambulance is assigned and has location
         if (emergencyData.assignedAmbulance?.currentLocation) {
@@ -185,18 +238,73 @@ export default function EmergencyTrackingScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [emergencyId, calculateETA, router]);
+  }, [emergencyId, router]);
 
   useEffect(() => {
     fetchEmergencyDetails();
 
-    // Poll for updates every 10 seconds
+    // Setup socket listener for real-time ambulance location
+    setupAmbulanceTracking();
+
+    // Poll for updates every 30 seconds (reduced since we have real-time updates)
     const interval = setInterval(() => {
       fetchEmergencyDetails(false);
-    }, 10000);
+    }, 30000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      cleanupAmbulanceTracking();
+    };
   }, [fetchEmergencyDetails]);
+
+  const setupAmbulanceTracking = async () => {
+    try {
+      // Dynamically import socket service
+      const { default: service } = await import('../../services/socketService');
+      socketService = service;
+
+      // Connect socket if not already connected
+      if (!socketService.isConnected()) {
+        const connected = await socketService.connect();
+        if (!connected) {
+          console.warn('⚠️ Could not connect socket for tracking');
+          return;
+        }
+      }
+
+      // Join emergency room
+      socketService.joinEmergencyRoom(emergencyId);
+
+      // Listen for ambulance location updates
+      socketService.onAmbulanceLocationUpdate((data: any) => {
+        if (data.emergencyId === emergencyId) {
+          console.log('🚑 Ambulance location update received:', data.location);
+          
+          setDriverLocation({
+            latitude: data.location.lat,
+            longitude: data.location.lng,
+          });
+
+          // Recalculate ETA if we have patient location
+          if (emergency?.location) {
+            calculateETA(
+              [data.location.lng, data.location.lat],
+              [emergency.location.lng, emergency.location.lat]
+            );
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error setting up ambulance tracking:', error);
+    }
+  };
+
+  const cleanupAmbulanceTracking = () => {
+    if (socketService && socketService.isConnected()) {
+      socketService.leaveEmergencyRoom(emergencyId);
+      socketService.offAmbulanceLocationUpdate();
+    }
+  };
 
   const handleCancelEmergency = () => {
     Alert.alert(
@@ -331,6 +439,7 @@ export default function EmergencyTrackingScreen() {
             longitudeDelta: 0.02 * ASPECT_RATIO,
           }}
           style={styles.map}
+          customMapScript={polylineCode}
         >
           {/* Patient Location Marker */}
           <Marker

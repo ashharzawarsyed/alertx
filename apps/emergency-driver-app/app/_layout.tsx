@@ -26,6 +26,9 @@ export default function RootLayout() {
 
   // Handle navigation based on auth state
   useEffect(() => {
+    // Wait for layout to mount before navigating
+    if (segments.length === 1) return;
+    
     const inAuthGroup = segments[0] === '(tabs)';
 
     if (!isAuthenticated && inAuthGroup) {

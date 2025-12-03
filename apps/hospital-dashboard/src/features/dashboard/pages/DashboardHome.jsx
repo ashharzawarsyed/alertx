@@ -10,10 +10,21 @@ import {
   Warning,
   Truck,
   ChartBar,
+  CircleDashed,
+  FirstAid,
+  User,
+  Bell,
+  X,
+  Phone,
 } from "phosphor-react";
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import toast, { Toaster } from "react-hot-toast";
 
+import { AmbulanceCard } from "../../../components/emergency/EmergencyCards";
+import PatientCarouselErrorBoundary from "../../../components/emergency/PatientCarouselErrorBoundary";
+import { PatientNavigationCarousel } from "../../../components/emergency/PatientNavigationCarousel";
+import { HospitalTrackingMap } from "../../../components/tracking/HospitalTrackingMap";
 import { useAuth } from "../../../hooks/useAuth";
 import hospitalService from "../../../services/hospitalService";
 import patientService from "../../../services/patientService";
@@ -21,11 +32,30 @@ import socketService from "../../../services/socketService";
 
 const DashboardHome = () => {
   const { user, hospital, token } = useAuth();
+  // User's Priority 1 state
   const [hospitalData, setHospitalData] = useState(null);
   const [stats, setStats] = useState(null);
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Umer's tracking state
+  const [emergencies, setEmergencies] = useState([]);
+  const [ambulances, setAmbulances] = useState([]);
+  const [metrics, setMetrics] = useState({});
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [isLoading, setIsLoading] = useState(false);
+  const [incomingPatients, setIncomingPatients] = useState([]);
+  const [criticalAlerts, setCriticalAlerts] = useState([]);
+  const [lastNotificationTime, setLastNotificationTime] = useState(Date.now());
+  
+  // Tracking modal state
+  const [trackingModal, setTrackingModal] = useState({
+    isOpen: false,
+    patient: null,
+    ambulance: null,
+    hospital: null,
+  });
 
   const hospitalId =
     hospital?.id || hospital?._id || user?.hospitalInfo?.hospitalId;
@@ -167,6 +197,76 @@ const DashboardHome = () => {
     return "bg-green-500";
   };
 
+  // Umer's tracking functions
+  const handleTrackAmbulance = (ambulance) => {
+    console.log("Tracking ambulance:", ambulance.id);
+    
+    // Find patient assigned to this ambulance
+    const assignedPatient = incomingPatients.find(
+      p => p.ambulanceId === ambulance.id || 
+           p.id === ambulance.assignedEmergencyId ||
+           p.id === ambulance.assignedEmergency
+    );
+    
+    if (assignedPatient) {
+      setTrackingModal({
+        isOpen: true,
+        patient: assignedPatient,
+        ambulance: ambulance,
+        hospital: hospital,
+      });
+    } else {
+      toast.error("No patient assigned to this ambulance");
+    }
+  };
+
+  const handleViewTracking = (patient, ambulance, hospitalData) => {
+    setTrackingModal({
+      isOpen: true,
+      patient: patient,
+      ambulance: ambulance,
+      hospital: hospitalData || hospital,
+    });
+  };
+
+  const closeTrackingModal = () => {
+    setTrackingModal({
+      isOpen: false,
+      patient: null,
+      ambulance: null,
+      hospital: null,
+    });
+  };
+
+  const handleAcceptPatient = (patient) => {
+    console.log("Accepting patient:", patient);
+    toast.success(`Patient ${patient.patientName} accepted`);
+  };
+
+  const handlePrepareForPatient = (patient) => {
+    console.log("Preparing for patient:", patient);
+    toast.success(`Preparing resources for ${patient.patientName}`);
+  };
+
+  const handleCallParamedic = (patient) => {
+    console.log("Calling paramedic for:", patient);
+    toast.success(`Calling paramedic: ${patient.paramedic?.phone || 'Unknown'}`);
+  };
+
+  const handleAssignAmbulance = (ambulance) => {
+    console.log("Assigning ambulance:", ambulance);
+    toast.success(`Ambulance ${ambulance.vehicleNumber} assigned`);
+  };
+
+  console.log("Dashboard state:", {
+    emergencies,
+    ambulances,
+    metrics,
+    incomingPatients,
+    criticalAlerts,
+  });
+
+  // User's loading state
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -174,6 +274,7 @@ const DashboardHome = () => {
           <div className="relative w-20 h-20 mx-auto mb-6">
             <div className="absolute inset-0 border-4 border-blue-500/30 rounded-full"></div>
             <div className="absolute inset-0 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+          </div>
           </div>
           <p className="text-gray-300 text-lg font-medium">
             Loading dashboard...
@@ -183,6 +284,7 @@ const DashboardHome = () => {
     );
   }
 
+  // User's error state
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
@@ -238,6 +340,7 @@ const DashboardHome = () => {
     );
   }
 
+  // Process patients for user's dashboard
   const admittedPatients = patients.filter(
     (p) => p.status === "admitted" || p.admissionStatus === "admitted"
   );
@@ -245,9 +348,73 @@ const DashboardHome = () => {
     (p) => p.severity === "critical" || p.condition === "critical"
   );
 
+  // Combined return with both tracking features and user's Priority 1 bed management
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 space-y-6">
-      {/* Header */}
+      {/* Umer's Critical Alerts */}
+      {criticalAlerts.length > 0 && (
+        <div className="sticky top-0 z-50 bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg rounded-2xl">
+          <div className="px-6 py-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-white/20 rounded-lg">
+                <Warning size={20} className="text-white" />
+              </div>
+              <h2 className="text-lg font-semibold">Critical System Alerts</h2>
+              <div className="px-3 py-1 bg-white/20 text-white text-sm font-medium rounded-full">
+                {criticalAlerts.length} Active
+              </div>
+            </div>
+            <div className="flex gap-4 overflow-x-auto pb-2">
+              {criticalAlerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className="flex-shrink-0 bg-white/10 backdrop-blur-sm rounded-xl p-4 min-w-80 border border-white/20"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-medium text-white text-sm">
+                      {alert.title}
+                    </h3>
+                    <button
+                      onClick={() =>
+                        setCriticalAlerts((prev) =>
+                          prev.filter((a) => a.id !== alert.id)
+                        )
+                      }
+                      className="text-white/80 hover:text-white transition-colors"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                  <p className="text-white/90 text-xs mb-3">{alert.message}</p>
+                  {alert.actionRequired && (
+                    <button className="px-3 py-1.5 bg-white text-red-600 text-xs rounded-lg font-medium hover:bg-white/90 transition-colors">
+                      {alert.actionRequired}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Umer's Incoming Patients Carousel */}
+      {incomingPatients.length > 0 && (
+        <PatientCarouselErrorBoundary>
+          <PatientNavigationCarousel
+            patients={incomingPatients}
+            ambulances={ambulances}
+            hospital={hospital}
+            onAccept={handleAcceptPatient}
+            onPrepare={handlePrepareForPatient}
+            onCallParamedic={handleCallParamedic}
+            onViewTracking={handleViewTracking}
+            autoAdvanceInterval={null}
+          />
+        </PatientCarouselErrorBoundary>
+      )}
+      
+      {/* User's Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -272,27 +439,30 @@ const DashboardHome = () => {
             </span>
           </p>
         </div>
-        <div
-          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl backdrop-blur-xl border transition-all ${
-            socketService.isConnected
-              ? "bg-green-500/10 border-green-500/30 text-green-400"
-              : "bg-red-500/10 border-red-500/30 text-red-400"
-          }`}
-        >
+        <div className="flex items-center gap-4">
+          {isLoading && <CircleDashed size={20} className="animate-spin text-blue-500" />}
           <div
-            className={`w-2.5 h-2.5 rounded-full ${
+            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl backdrop-blur-xl border transition-all ${
               socketService.isConnected
-                ? "bg-green-400 shadow-lg shadow-green-400/50 animate-pulse"
-                : "bg-red-400"
+                ? "bg-green-500/10 border-green-500/30 text-green-400"
+                : "bg-red-500/10 border-red-500/30 text-red-400"
             }`}
-          ></div>
-          <span className="text-sm font-bold uppercase tracking-wider">
-            {socketService.isConnected ? "Live" : "Offline"}
-          </span>
+          >
+            <div
+              className={`w-2.5 h-2.5 rounded-full ${
+                socketService.isConnected
+                  ? "bg-green-400 shadow-lg shadow-green-400/50 animate-pulse"
+                  : "bg-red-400"
+              }`}
+            ></div>
+            <span className="text-sm font-bold uppercase tracking-wider">
+              {socketService.isConnected ? "Live" : "Offline"}
+            </span>
+          </div>
         </div>
       </motion.div>
 
-      {/* Key Metrics */}
+      {/* User's Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Total Beds */}
         <motion.div
@@ -829,6 +999,88 @@ const DashboardHome = () => {
           </div>
         </motion.div>
       </div>
+
+      {/* Umer's Tracking Modal */}
+      {trackingModal.isOpen && trackingModal.patient && trackingModal.ambulance && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col overflow-hidden">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 flex items-center justify-between flex-shrink-0">
+              <div>
+                <h2 className="text-2xl font-bold mb-1">Live Ambulance Tracking</h2>
+                <p className="text-blue-100 text-sm">
+                  Patient: {trackingModal.patient.patientName || trackingModal.patient.name} • 
+                  Ambulance: {trackingModal.ambulance.vehicleNumber || trackingModal.ambulance.id}
+                </p>
+              </div>
+              <button
+                onClick={closeTrackingModal}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                aria-label="Close tracking modal"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Map Container */}
+            <div className="flex-1 p-6 bg-slate-50 overflow-hidden">
+              <HospitalTrackingMap
+                ambulance={trackingModal.ambulance}
+                patient={trackingModal.patient}
+                hospital={trackingModal.hospital}
+                status={
+                  trackingModal.patient.status === 'pickedUp' || trackingModal.patient.pickupTime
+                    ? 'transporting_to_hospital'
+                    : 'en_route_to_patient'
+                }
+                className="h-full w-full"
+              />
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-white border-t border-slate-200 p-4 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="text-sm">
+                  <span className="text-slate-600">Condition:</span>
+                  <span className="ml-2 font-semibold text-slate-900">
+                    {trackingModal.patient.condition || trackingModal.patient.emergencyType}
+                  </span>
+                </div>
+                <div className="text-sm">
+                  <span className="text-slate-600">ETA:</span>
+                  <span className="ml-2 font-semibold text-slate-900">
+                    {trackingModal.patient.eta || trackingModal.patient.estimatedArrival || 'Calculating...'}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={closeTrackingModal}
+                className="px-6 py-2 bg-slate-600 hover:bg-slate-700 text-white font-semibold rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Enhanced Toast Notifications */}
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: "#fff",
+            color: "#374151",
+            border: "1px solid #e5e7eb",
+            borderRadius: "12px",
+            boxShadow:
+              "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+            fontSize: "14px",
+            fontWeight: "500",
+          },
+        }}
+      />
     </div>
   );
 };

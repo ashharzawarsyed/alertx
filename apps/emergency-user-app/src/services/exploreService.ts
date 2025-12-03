@@ -81,7 +81,7 @@ class ExploreService {
     availableBeds?: boolean
   ): Promise<{ success: boolean; data?: Hospital[]; message?: string }> {
     try {
-      let queryParams = `lat=${lat}&lng=${lng}&radius=${radius}`;
+      let queryParams = `lat=${lat}&lng=${lng}&radius=${radius}&limit=50`;
 
       if (facilities && facilities.length > 0) {
         queryParams += `&facilities=${facilities.join(",")}`;

@@ -85,6 +85,21 @@ const emergencySchema = new mongoose.Schema(
       ref: "Hospital",
     },
 
+    // Ambulance real-time location tracking
+    ambulanceLocation: {
+      lat: {
+        type: Number,
+      },
+      lng: {
+        type: Number,
+      },
+      lastUpdated: {
+        type: Date,
+      },
+      speed: Number,
+      heading: Number,
+    },
+
     // Timing information
     requestTime: {
       type: Date,

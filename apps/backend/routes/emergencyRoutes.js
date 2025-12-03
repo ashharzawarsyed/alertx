@@ -11,6 +11,7 @@ import {
   markPickedUp,
   markArrivedAtHospital,
   cancelEmergency,
+  rejectEmergency,
 } from "../controllers/emergencyController.js";
 import {
   validateEmergencyRequest,
@@ -141,6 +142,19 @@ router.post(
   authenticate,
   validateObjectId("id"),
   cancelEmergency
+);
+
+/**
+ * @route   POST /api/v1/emergencies/:id/reject
+ * @desc    Driver rejects/declines emergency request
+ * @access  Private (Driver)
+ */
+router.post(
+  "/:id/reject",
+  authenticate,
+  authorize(USER_ROLES.DRIVER),
+  validateObjectId("id"),
+  rejectEmergency
 );
 
 export default router;

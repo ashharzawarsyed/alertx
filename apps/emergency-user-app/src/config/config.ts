@@ -51,10 +51,20 @@ export const getApiUrl = (): string => {
 };
 
 /**
+ * Get Socket URL (same host as API)
+ */
+export const getSocketUrl = (): string => {
+  const apiUrl = getApiUrl();
+  // Remove /api/v1 from the end to get base URL
+  return apiUrl.replace('/api/v1', '');
+};
+
+/**
  * Configuration object
  */
 export const Config = {
   API_URL: getApiUrl(),
+  SOCKET_URL: getSocketUrl(),
   API_TIMEOUT: 10000,
   GOOGLE_MAPS_API_KEY: "AIzaSyCgEmYHXUzysg6yRptadI6kv1BnXaNAIPI",
 };

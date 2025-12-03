@@ -218,10 +218,10 @@ class AuthService {
     });
   }
 
-  async resetPassword(token: string, newPassword: string) {
+  async resetPassword(email: string, code: string, newPassword: string) {
     return this.makeRequest("/auth/reset-password", {
       method: "POST",
-      body: JSON.stringify({ token, newPassword }),
+      body: JSON.stringify({ email, code, newPassword }),
     });
   }
 

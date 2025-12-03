@@ -1110,6 +1110,7 @@ const styles = StyleSheet.create({
   formContainer: {
     width: "100%",
     marginBottom: 20, // Space above navigation bar
+    zIndex: 10, // Ensure form overlaps header
   },
   formCard: {
     backgroundColor: "#FFFFFF",
