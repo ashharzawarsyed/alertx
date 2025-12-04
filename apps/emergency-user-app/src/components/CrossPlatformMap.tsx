@@ -49,7 +49,8 @@ const CrossPlatformMap = React.forwardRef<any, CrossPlatformMapProps>(
         {
           position: { lat: ${marker.latitude}, lng: ${marker.longitude} },
           title: "${marker.title || `Marker ${index + 1}`}",
-          label: "${index + 1}"
+          label: "${index + 1}",
+          color: "${marker.color || 'red'}"
         }`
         )
         .join(",");
@@ -84,30 +85,34 @@ const CrossPlatformMap = React.forwardRef<any, CrossPlatformMapProps>(
 
         // Add markers
         const markers = [${markersJS}];
-        markers.forEach((markerData) => {
-          new google.maps.Marker({
+        console.log('📍 Adding', markers.length, 'markers to map');
+        
+        markers.forEach((markerData, index) => {
+          const marker = new google.maps.Marker({
             position: markerData.position,
             map: map,
             title: markerData.title,
             label: markerData.label,
+            icon: markerData.color === '#3B82F6' ? {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 10,
+              fillColor: markerData.color,
+              fillOpacity: 1,
+              strokeColor: "#ffffff",
+              strokeWeight: 2,
+            } : {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 12,
+              fillColor: markerData.color || '#EF4444',
+              fillOpacity: 1,
+              strokeColor: "#ffffff",
+              strokeWeight: 3,
+            }
           });
-        });
-
-        // Center marker (current location)
-        new google.maps.Marker({
-          position: center,
-          map: map,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 8,
-            fillColor: "#EF4444",
-            fillOpacity: 1,
-            strokeColor: "#ffffff",
-            strokeWeight: 2,
-          },
+          console.log('📍 Marker', index + 1, ':', markerData.title, 'at', markerData.position.lat, markerData.position.lng);
         });
         
-        console.log('🗺️ Markers added successfully');
+        console.log('✅ All markers added successfully');
 
         // Execute custom map script (e.g., polylines)
         ${customMapScript}

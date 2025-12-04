@@ -30,10 +30,53 @@ export default function ActiveEmergencyScreen() {
   const [distance, setDistance] = useState<number>(0);
   const [eta, setETA] = useState<number>(0);
 
+  // Calculate polyline code - MUST be before conditional return
+  const polylineCode = useMemo(() => {
+    if (!currentLocation || !activeEmergency) return '';
+    
+    const segments: PolylineSegment[] = [];
+    
+    // Route to patient (green solid line)
+    if (tripStatus === 'en_route' || tripStatus === 'arrived') {
+      segments.push({
+        coordinates: [
+          { lat: currentLocation.lat, lng: currentLocation.lng },
+          { lat: activeEmergency.location.lat, lng: activeEmergency.location.lng },
+        ],
+        color: '#10b981',
+        weight: 4,
+        opacity: 0.8,
+      });
+    }
+    
+    // Route to hospital (blue dashed line)
+    if (activeEmergency.assignedHospital && (tripStatus === 'transporting' || tripStatus === 'completed')) {
+      const hospitalLat = (activeEmergency.assignedHospital as any).location?.lat || 33.7077;
+      const hospitalLng = (activeEmergency.assignedHospital as any).location?.lng || 73.0533;
+      
+      segments.push({
+        coordinates: [
+          { lat: currentLocation.lat, lng: currentLocation.lng },
+          { lat: hospitalLat, lng: hospitalLng },
+        ],
+        color: '#3b82f6',
+        weight: 4,
+        opacity: 0.8,
+        dashArray: '10, 5',
+      });
+    }
+    
+    return generatePolylineCode(segments);
+  }, [currentLocation, tripStatus, activeEmergency]);
+
+  // Check for active emergency and redirect AFTER all hooks
   useEffect(() => {
     if (!activeEmergency) {
-      router.replace('/(tabs)');
-      return;
+      // Use timeout to avoid navigation during render
+      const timer = setTimeout(() => {
+        router.replace('/(tabs)');
+      }, 0);
+      return () => clearTimeout(timer);
     }
 
     // Start continuous location tracking with socket emission
@@ -148,8 +191,15 @@ export default function ActiveEmergencyScreen() {
     }
   };
 
+  // Don't render if no active emergency (useEffect will handle redirect)
   if (!activeEmergency) {
-    return null;
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Loading...</Text>
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -212,43 +262,7 @@ export default function ActiveEmergencyScreen() {
                   color: '#3b82f6',
                 }] : []),
               ]}
-              polylineCode={useMemo(() => {
-                if (!currentLocation) return '';
-                
-                const segments: PolylineSegment[] = [];
-                
-                // Route to patient (green solid line)
-                if (tripStatus === 'en_route' || tripStatus === 'arrived') {
-                  segments.push({
-                    coordinates: [
-                      { lat: currentLocation.lat, lng: currentLocation.lng },
-                      { lat: activeEmergency.location.lat, lng: activeEmergency.location.lng },
-                    ],
-                    color: '#10b981',
-                    weight: 4,
-                    opacity: 0.8,
-                  });
-                }
-                
-                // Route to hospital (blue dashed line)
-                if (activeEmergency.assignedHospital && (tripStatus === 'transporting' || tripStatus === 'completed')) {
-                  const hospitalLat = (activeEmergency.assignedHospital as any).location?.lat || 33.7077;
-                  const hospitalLng = (activeEmergency.assignedHospital as any).location?.lng || 73.0533;
-                  
-                  segments.push({
-                    coordinates: [
-                      { lat: currentLocation.lat, lng: currentLocation.lng },
-                      { lat: hospitalLat, lng: hospitalLng },
-                    ],
-                    color: '#3b82f6',
-                    weight: 4,
-                    opacity: 0.8,
-                    dashArray: '10, 5',
-                  });
-                }
-                
-                return generatePolylineCode(segments);
-              }, [currentLocation, tripStatus, activeEmergency])}
+              polylineCode={polylineCode}
             />
           </View>
           <View style={styles.mapStats}>
