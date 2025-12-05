@@ -14,8 +14,10 @@ import { useEmergencyStore } from '@/src/store/emergencyStore';
 import emergencyService from '@/src/services/emergencyService';
 import locationService, { LocationData } from '@/src/services/locationService';
 import socketService from '@/src/services/socketService';
+import routingService, { RouteCoordinate } from '@/src/services/routingService';
 import CrossPlatformMap from '@/components/CrossPlatformMap';
 import { generatePolylineCode, PolylineSegment } from '@/src/components/maps/MapPolyline';
+import { startRouteSimulation, stopRouteSimulation, AMBULANCE_START_LOCATION, PATIENT_LOCATION, POF_HOSPITAL } from '@/src/utils/routeSimulation';
 
 const { width } = Dimensions.get('window');
 
@@ -29,45 +31,119 @@ export default function ActiveEmergencyScreen() {
   const [currentLocation, setCurrentLocation] = useState<LocationData | null>(null);
   const [distance, setDistance] = useState<number>(0);
   const [eta, setETA] = useState<number>(0);
+  const [routeToPatient, setRouteToPatient] = useState<RouteCoordinate[]>([]);
+  const [routeToHospital, setRouteToHospital] = useState<RouteCoordinate[]>([]);
+  const [traveledPath, setTraveledPath] = useState<RouteCoordinate[]>([]);
+  const [remainingPath, setRemainingPath] = useState<RouteCoordinate[]>([]);
+  const [isSimulating, setIsSimulating] = useState(false);
 
-  // Calculate polyline code - MUST be before conditional return
+  // Calculate polyline code with real routes - MUST be before conditional return
   const polylineCode = useMemo(() => {
     if (!currentLocation || !activeEmergency) return '';
     
     const segments: PolylineSegment[] = [];
     
-    // Route to patient (green solid line)
+    // En route to patient
     if (tripStatus === 'en_route' || tripStatus === 'arrived') {
-      segments.push({
-        coordinates: [
-          { lat: currentLocation.lat, lng: currentLocation.lng },
-          { lat: activeEmergency.location.lat, lng: activeEmergency.location.lng },
-        ],
-        color: '#10b981',
-        weight: 4,
-        opacity: 0.8,
-      });
+      // Traveled path (blue dashed)
+      if (traveledPath.length > 1) {
+        segments.push({
+          coordinates: traveledPath,
+          color: '#3b82f6',
+          weight: 5,
+          opacity: 0.7,
+          dashArray: '10, 5',
+          zIndex: 2,
+        });
+      }
+      
+      // Remaining path (green solid)
+      if (remainingPath.length > 1) {
+        segments.push({
+          coordinates: remainingPath,
+          color: '#10b981',
+          weight: 5,
+          opacity: 0.9,
+          zIndex: 1,
+        });
+      }
     }
     
-    // Route to hospital (blue dashed line)
+    // Transporting to hospital
     if (activeEmergency.assignedHospital && (tripStatus === 'transporting' || tripStatus === 'completed')) {
-      const hospitalLat = (activeEmergency.assignedHospital as any).location?.lat || 33.7077;
-      const hospitalLng = (activeEmergency.assignedHospital as any).location?.lng || 73.0533;
+      // Traveled path (blue dashed)
+      if (traveledPath.length > 1) {
+        segments.push({
+          coordinates: traveledPath,
+          color: '#3b82f6',
+          weight: 5,
+          opacity: 0.7,
+          dashArray: '10, 5',
+          zIndex: 2,
+        });
+      }
       
-      segments.push({
-        coordinates: [
-          { lat: currentLocation.lat, lng: currentLocation.lng },
-          { lat: hospitalLat, lng: hospitalLng },
-        ],
-        color: '#3b82f6',
-        weight: 4,
-        opacity: 0.8,
-        dashArray: '10, 5',
-      });
+      // Remaining path (orange solid)
+      if (remainingPath.length > 1) {
+        segments.push({
+          coordinates: remainingPath,
+          color: '#f97316',
+          weight: 5,
+          opacity: 0.9,
+          zIndex: 1,
+        });
+      }
     }
     
     return generatePolylineCode(segments);
-  }, [currentLocation, tripStatus, activeEmergency]);
+  }, [currentLocation, tripStatus, traveledPath, remainingPath, activeEmergency]);
+
+  // Fetch routes when emergency is assigned
+  useEffect(() => {
+    if (!activeEmergency) return;
+
+    const fetchRoutes = async () => {
+      try {
+        // Get current location first
+        const location = await locationService.getCurrentLocation();
+        if (!location) {
+          console.error('❌ Could not get current location');
+          return;
+        }
+
+        console.log('🗺️ Fetching route to patient...');
+        const patientRoute = await routingService.fetchRoute(
+          { lat: location.lat, lng: location.lng },
+          { lat: activeEmergency.location.lat, lng: activeEmergency.location.lng }
+        );
+        setRouteToPatient(patientRoute);
+        routingService.initializeRoute(patientRoute);
+        
+        // Update initial path state
+        setRemainingPath(patientRoute);
+        setTraveledPath([]);
+
+        // Also fetch route to hospital if assigned
+        if (activeEmergency.assignedHospital) {
+          const hospitalLat = (activeEmergency.assignedHospital as any).location?.lat || 33.7077;
+          const hospitalLng = (activeEmergency.assignedHospital as any).location?.lng || 73.0533;
+          
+          console.log('🗺️ Fetching route to hospital...');
+          const hospitalRoute = await routingService.fetchRoute(
+            { lat: activeEmergency.location.lat, lng: activeEmergency.location.lng },
+            { lat: hospitalLat, lng: hospitalLng }
+          );
+          setRouteToHospital(hospitalRoute);
+        }
+
+        console.log('✅ Routes fetched successfully');
+      } catch (error) {
+        console.error('❌ Error fetching routes:', error);
+      }
+    };
+
+    fetchRoutes();
+  }, [activeEmergency]);
 
   // Check for active emergency and redirect AFTER all hooks
   useEffect(() => {
@@ -90,6 +166,7 @@ export default function ActiveEmergencyScreen() {
       // 3. Component unmounts
       console.log('🛑 Stopping location tracking - emergency ended');
       locationService.stopTracking();
+      routingService.reset();
     };
   }, [activeEmergency]);
 
@@ -101,12 +178,24 @@ export default function ActiveEmergencyScreen() {
         // Update socket with location
         socketService.updateLocation(location);
 
+        // Update route progress
+        const routeSegment = routingService.updatePosition({
+          lat: location.lat,
+          lng: location.lng,
+        });
+        setTraveledPath(routeSegment.traveled);
+        setRemainingPath(routeSegment.remaining);
+
         // Calculate distance and ETA
         if (activeEmergency) {
-          const dist = locationService.calculateDistance(
-            location,
-            activeEmergency.location
-          );
+          const targetLocation = tripStatus === 'transporting' || tripStatus === 'completed'
+            ? {
+                lat: (activeEmergency.assignedHospital as any)?.location?.lat || 33.7077,
+                lng: (activeEmergency.assignedHospital as any)?.location?.lng || 73.0533,
+              }
+            : activeEmergency.location;
+
+          const dist = locationService.calculateDistance(location, targetLocation);
           setDistance(dist);
           setETA(locationService.calculateETA(dist));
         }
@@ -128,6 +217,29 @@ export default function ActiveEmergencyScreen() {
       if (result.success) {
         setTripStatus('transporting');
         socketService.notifyPickup(activeEmergency._id, currentLocation);
+        
+        // Fetch NEW route from current location to hospital
+        if (activeEmergency.assignedHospital) {
+          const hospitalLat = (activeEmergency.assignedHospital as any).location?.lat || 33.7077;
+          const hospitalLng = (activeEmergency.assignedHospital as any).location?.lng || 73.0533;
+          
+          console.log('🏥 Fetching route from current location to hospital...');
+          console.log(`📍 Current: ${currentLocation.lat}, ${currentLocation.lng}`);
+          console.log(`🏥 Hospital: ${hospitalLat}, ${hospitalLng}`);
+          
+          // Fetch route from CURRENT location (not patient location)
+          const hospitalRoute = await routingService.fetchRoute(
+            { lat: currentLocation.lat, lng: currentLocation.lng },
+            { lat: hospitalLat, lng: hospitalLng }
+          );
+          
+          console.log(`✅ Hospital route fetched: ${hospitalRoute.length} points`);
+          setRouteToHospital(hospitalRoute);
+          routingService.initializeRoute(hospitalRoute);
+          setRemainingPath(hospitalRoute);
+          setTraveledPath([]);
+        }
+        
         Alert.alert('Success', 'Patient picked up. En route to hospital.');
       } else {
         Alert.alert('Error', result.message || 'Failed to update status');
@@ -178,6 +290,12 @@ export default function ActiveEmergencyScreen() {
         addToHistory(activeEmergency);
         clearActiveEmergency();
         
+        // Stop simulation if running
+        if (isSimulating) {
+          stopRouteSimulation();
+          setIsSimulating(false);
+        }
+        
         // Location tracking stops automatically via useEffect cleanup
         // when component unmounts on navigation back to home
         Alert.alert('Trip Completed', 'Great job! Ready for next emergency.', [
@@ -188,6 +306,72 @@ export default function ActiveEmergencyScreen() {
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to complete trip');
+    }
+  };
+
+  const handleToggleSimulation = () => {
+    if (isSimulating) {
+      // Stop simulation
+      stopRouteSimulation();
+      setIsSimulating(false);
+      console.log('🛑 Route simulation stopped');
+    } else {
+      // Determine which route to simulate
+      const routeToUse = (tripStatus === 'transporting' || tripStatus === 'completed') 
+        ? routeToHospital 
+        : routeToPatient;
+
+      if (routeToUse.length === 0) {
+        Alert.alert('No Route', 'Please wait for route to be fetched from Google API');
+        return;
+      }
+
+      const stageName = (tripStatus === 'transporting' || tripStatus === 'completed')
+        ? 'Patient → Hospital'
+        : 'Ambulance → Patient';
+
+      console.log(`🚀 Starting route simulation: ${stageName}`);
+      Alert.alert(
+        'Route Simulation',
+        `This will simulate movement along the Google API route (${routeToUse.length} points). Continue?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Start',
+            onPress: () => {
+              setIsSimulating(true);
+              startRouteSimulation(
+                routeToUse, // Pass the Google API route
+                (location) => {
+                  // Simulate location updates
+                  setCurrentLocation(location);
+                  socketService.updateLocation(location);
+
+                  // Update route progress
+                  const routeSegment = routingService.updatePosition({
+                    lat: location.lat,
+                    lng: location.lng,
+                  });
+                  setTraveledPath(routeSegment.traveled);
+                  setRemainingPath(routeSegment.remaining);
+
+                  // Calculate distance and ETA
+                  if (activeEmergency) {
+                    const targetLocation = tripStatus === 'transporting' || tripStatus === 'completed'
+                      ? { lat: (activeEmergency.assignedHospital as any)?.location?.lat || 33.7500, lng: (activeEmergency.assignedHospital as any)?.location?.lng || 72.7847 }
+                      : activeEmergency.location;
+
+                    const dist = locationService.calculateDistance(location, targetLocation);
+                    setDistance(dist);
+                    setETA(locationService.calculateETA(dist));
+                  }
+                },
+                2 // 2x speed
+              );
+            },
+          },
+        ]
+      );
     }
   };
 
@@ -214,7 +398,16 @@ export default function ActiveEmergencyScreen() {
           <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Active Emergency</Text>
-        <View style={styles.placeholder} />
+        <TouchableOpacity
+          style={styles.testButton}
+          onPress={handleToggleSimulation}
+        >
+          <Ionicons 
+            name={isSimulating ? "stop-circle" : "play-circle"} 
+            size={24} 
+            color="#fff" 
+          />
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content}>
@@ -227,6 +420,16 @@ export default function ActiveEmergencyScreen() {
             {tripStatus === 'completed' && '✅ Trip Completed'}
           </Text>
         </View>
+        
+        {/* Simulation Indicator */}
+        {isSimulating && (
+          <View style={styles.simulationBanner}>
+            <Ionicons name="speedometer" size={16} color="#f59e0b" />
+            <Text style={styles.simulationText}>
+              🧪 Test Mode: Following Google API route
+            </Text>
+          </View>
+        )}
 
         {/* Map with Route */}
         <View style={styles.mapCard}>
@@ -246,6 +449,7 @@ export default function ActiveEmergencyScreen() {
                   title: 'Patient Location',
                   description: activeEmergency.patient.name,
                   color: '#dc2626',
+                  icon: 'user-injured', // Patient/injured person icon
                 },
                 ...(currentLocation ? [{
                   latitude: currentLocation.lat,
@@ -253,6 +457,7 @@ export default function ActiveEmergencyScreen() {
                   title: 'Your Location',
                   description: '🚑 Ambulance',
                   color: '#10b981',
+                  icon: 'ambulance', // Ambulance icon
                 }] : []),
                 ...(activeEmergency.assignedHospital ? [{
                   latitude: (activeEmergency.assignedHospital as any).location?.lat || 33.7077,
@@ -260,6 +465,7 @@ export default function ActiveEmergencyScreen() {
                   title: activeEmergency.assignedHospital.name,
                   description: '🏥 Hospital',
                   color: '#3b82f6',
+                  icon: 'hospital', // Hospital icon
                 }] : []),
               ]}
               polylineCode={polylineCode}
@@ -570,6 +776,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
+  },
+  testButton: {
+    padding: 8,
+  },
+  simulationBanner: {
+    backgroundColor: '#fef3c7',
+    padding: 12,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  simulationText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#92400e',
+    flex: 1,
   },
   primaryButton: {
     backgroundColor: '#dc2626',
