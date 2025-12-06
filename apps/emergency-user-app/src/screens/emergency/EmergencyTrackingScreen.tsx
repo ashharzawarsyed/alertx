@@ -13,13 +13,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { emergencyService, Emergency } from "../../services/emergencyService";
 import CrossPlatformMap, { Marker } from "../../components/CrossPlatformMap";
-import { 
-  useAmbulanceTracking, 
-  TrackingLocation 
-} from "../../components/maps/AmbulanceTrackingPolyline";
 import { generatePolylineCode, PolylineSegment } from "../../components/maps/MapPolyline";
 
 // Socket service will be dynamically imported when needed
@@ -71,43 +68,42 @@ export default function EmergencyTrackingScreen() {
   const [eta, setEta] = useState<string | null>(null);
   const [distance, setDistance] = useState<string | null>(null);
   const [trackingStatus, setTrackingStatus] = useState<'en_route_to_patient' | 'transporting_to_hospital' | 'completed'>('en_route_to_patient');
+  const [routeCoordinates, setRouteCoordinates] = useState<Array<{lat: number, lng: number}>>([]);
+  const [traveledPath, setTraveledPath] = useState<Array<{lat: number, lng: number}>>([]);
+  const [remainingPath, setRemainingPath] = useState<Array<{lat: number, lng: number}>>([]);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Generate tracking polylines
-  const ambulanceTracking = useAmbulanceTracking(
-    {
-      lat: driverLocation?.latitude || 0,
-      lng: driverLocation?.longitude || 0,
-    },
-    {
-      lat: emergency?.location.lat || 0,
-      lng: emergency?.location.lng || 0,
-    },
-    {
-      // Use PIMS Hospital Islamabad as default hospital location
-      lat: (emergency?.assignedHospital as any)?.location?.lat || 33.7077,
-      lng: (emergency?.assignedHospital as any)?.location?.lng || 73.0533,
-    },
-    trackingStatus
-  );
-
-  // Convert tracking segments to polyline format
-  const polylineSegments: PolylineSegment[] = React.useMemo(() => {
-    return ambulanceTracking.segments.map((segment) => ({
-      coordinates: [segment.from, segment.to],
-      color: segment.color,
-      weight: 4,
-      opacity: 1.0,
-      dashArray: segment.dashArray,
-      zIndex: segment.zIndex,
-    }));
-  }, [ambulanceTracking.segments]);
-
-  // Generate polyline code for WebView
+  // Generate polyline code for WebView with traveled/remaining paths
   const polylineCode = React.useMemo(() => {
-    return generatePolylineCode(polylineSegments);
-  }, [polylineSegments]);
+    const segments: PolylineSegment[] = [];
+    
+    // Traveled path (blue dashed)
+    if (traveledPath.length > 1) {
+      segments.push({
+        coordinates: traveledPath,
+        color: '#3b82f6',
+        weight: 5,
+        opacity: 0.7,
+        dashArray: '10, 5',
+        zIndex: 2,
+      });
+    }
+    
+    // Remaining path (green for to patient, orange for to hospital)
+    if (remainingPath.length > 1) {
+      const color = trackingStatus === 'transporting_to_hospital' ? '#f97316' : '#10b981';
+      segments.push({
+        coordinates: remainingPath,
+        color: color,
+        weight: 5,
+        opacity: 0.9,
+        zIndex: 1,
+      });
+    }
+    
+    return generatePolylineCode(segments);
+  }, [traveledPath, remainingPath, trackingStatus]);
 
   // Pulse animation for ambulance marker
   useEffect(() => {
@@ -128,6 +124,103 @@ export default function EmergencyTrackingScreen() {
     pulse.start();
     return () => pulse.stop();
   }, []);
+
+  // Fetch route from Google Directions API
+  const fetchRoute = useCallback(async (origin: {lat: number, lng: number}, destination: {lat: number, lng: number}) => {
+    try {
+      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&mode=driving&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || Constants.expoConfig?.extra?.googleMapsApiKey}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.status === 'OK' && data.routes.length > 0) {
+        const route = data.routes[0];
+        const encodedPolyline = route.overview_polyline.points;
+        const decodedPath = decodePolyline(encodedPolyline);
+        
+        console.log(`✅ Route fetched: ${decodedPath.length} points`);
+        setRouteCoordinates(decodedPath);
+        setRemainingPath(decodedPath);
+        setTraveledPath([]);
+        
+        return decodedPath;
+      }
+    } catch (error) {
+      console.error('❌ Error fetching route:', error);
+    }
+    return [];
+  }, []);
+
+  // Decode Google's encoded polyline format
+  const decodePolyline = (encoded: string): Array<{lat: number, lng: number}> => {
+    const points: Array<{lat: number, lng: number}> = [];
+    let index = 0;
+    const len = encoded.length;
+    let lat = 0;
+    let lng = 0;
+
+    while (index < len) {
+      let b;
+      let shift = 0;
+      let result = 0;
+
+      do {
+        b = encoded.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+
+      const dlat = (result & 1) !== 0 ? ~(result >> 1) : result >> 1;
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+
+      do {
+        b = encoded.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+
+      const dlng = (result & 1) !== 0 ? ~(result >> 1) : result >> 1;
+      lng += dlng;
+
+      points.push({
+        lat: lat / 1e5,
+        lng: lng / 1e5,
+      });
+    }
+
+    return points;
+  };
+
+  // Update traveled/remaining path based on current location
+  const updateRoutePaths = useCallback((currentLat: number, currentLng: number) => {
+    if (routeCoordinates.length === 0) return;
+
+    // Find closest point on route
+    let minDistance = Infinity;
+    let closestIndex = 0;
+
+    for (let i = 0; i < routeCoordinates.length; i++) {
+      const point = routeCoordinates[i];
+      const dist = Math.sqrt(
+        Math.pow(point.lat - currentLat, 2) + Math.pow(point.lng - currentLng, 2)
+      );
+
+      if (dist < minDistance) {
+        minDistance = dist;
+        closestIndex = i;
+      }
+    }
+
+    // Split route into traveled and remaining
+    const traveled = routeCoordinates.slice(0, closestIndex + 1);
+    const remaining = routeCoordinates.slice(closestIndex);
+
+    setTraveledPath(traveled);
+    setRemainingPath(remaining);
+  }, [routeCoordinates]);
 
   // Calculate distance and ETA using Haversine formula
   const calculateETA = useCallback((coords1: [number, number], coords2: [number, number]) => {
@@ -184,10 +277,24 @@ export default function EmergencyTrackingScreen() {
           calculateETA(ambulanceCoords, patientCoords);
           
           // Set driver location for marker
-          setDriverLocation({
+          const driverLoc = {
             latitude: ambulanceCoords[1],
             longitude: ambulanceCoords[0],
-          });
+          };
+          setDriverLocation(driverLoc);
+          
+          // Fetch route from Google Directions API
+          const destination = trackingStatus === 'transporting_to_hospital'
+            ? {
+                lat: (emergencyData.assignedHospital as any)?.location?.lat || 33.7077,
+                lng: (emergencyData.assignedHospital as any)?.location?.lng || 73.0533,
+              }
+            : { lat: patientCoords[1], lng: patientCoords[0] };
+          
+          await fetchRoute(
+            { lat: driverLoc.latitude, lng: driverLoc.longitude },
+            destination
+          );
         } else if (
           emergencyData.assignedDriver &&
           emergencyData.status !== "pending"
@@ -284,6 +391,9 @@ export default function EmergencyTrackingScreen() {
             latitude: data.location.lat,
             longitude: data.location.lng,
           });
+
+          // Update route progress (traveled vs remaining)
+          updateRoutePaths(data.location.lat, data.location.lng);
 
           // Recalculate ETA if we have patient location
           if (emergency?.location) {
@@ -440,41 +550,36 @@ export default function EmergencyTrackingScreen() {
           }}
           style={styles.map}
           customMapScript={polylineCode}
-        >
-          {/* Patient Location Marker */}
-          <Marker
-            coordinate={{
+          markers={[
+            // Patient Location Marker
+            {
               latitude: emergency.location.lat,
               longitude: emergency.location.lng,
-            }}
-            title="Your Location"
-            description={emergency.location.address || "Emergency Location"}
-            pinColor="#EF4444"
-          >
-            <View style={styles.patientMarker}>
-              <Ionicons name="person" size={24} color="#FFFFFF" />
-            </View>
-          </Marker>
-
-          {/* Ambulance Marker */}
-          {driverLocation && (
-            <Marker
-              coordinate={driverLocation}
-              title="Ambulance"
-              description="En route to your location"
-              pinColor="#3B82F6"
-            >
-              <Animated.View
-                style={[
-                  styles.ambulanceMarker,
-                  { transform: [{ scale: pulseAnim }] },
-                ]}
-              >
-                <Ionicons name="medkit" size={24} color="#FFFFFF" />
-              </Animated.View>
-            </Marker>
-          )}
-        </CrossPlatformMap>
+              title: "Your Location",
+              description: emergency.location.address || "Emergency Location",
+              color: "#EF4444",
+              icon: "user-injured", // Injured person icon
+            },
+            // Ambulance Marker (if available)
+            ...(driverLocation ? [{
+              latitude: driverLocation.latitude,
+              longitude: driverLocation.longitude,
+              title: "Ambulance",
+              description: "En route to your location",
+              color: "#10b981",
+              icon: "ambulance", // Ambulance icon
+            }] : []),
+            // Hospital Marker (if assigned)
+            ...(emergency.assignedHospital ? [{
+              latitude: (emergency.assignedHospital as any)?.location?.lat || 33.7077,
+              longitude: (emergency.assignedHospital as any)?.location?.lng || 73.0533,
+              title: emergency.assignedHospital.name || "Hospital",
+              description: "Destination Hospital",
+              color: "#3B82F6",
+              icon: "hospital", // Hospital icon
+            }] : []),
+          ]}
+        />
 
         {/* ETA Overlay */}
         {driverLocation && eta && (
