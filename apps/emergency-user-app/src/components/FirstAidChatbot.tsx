@@ -71,9 +71,20 @@ const FirstAidChatbot: React.FC<FirstAidChatbotProps> = ({
         }
       );
 
+      // Safely extract text from response
+      let guidanceText = '';
+      const guidance = response.data.data.guidance;
+      if (typeof guidance === 'string') {
+        guidanceText = guidance;
+      } else if (guidance && typeof guidance === 'object') {
+        guidanceText = guidance.message || guidance.text || guidance.output || JSON.stringify(guidance);
+      } else {
+        guidanceText = 'I\'m here to help. What would you like to know?';
+      }
+
       const botMessage: Message = {
         id: Date.now(),
-        text: response.data.data.guidance.message || response.data.data.guidance,
+        text: guidanceText,
         sender: 'bot' as const,
         timestamp: new Date(),
         isInitial: true,
@@ -141,9 +152,20 @@ const FirstAidChatbot: React.FC<FirstAidChatbotProps> = ({
         }
       );
 
+      // Safely extract text from response
+      let guidanceText = '';
+      const guidance = response.data.data.guidance;
+      if (typeof guidance === 'string') {
+        guidanceText = guidance;
+      } else if (guidance && typeof guidance === 'object') {
+        guidanceText = guidance.message || guidance.text || guidance.output || JSON.stringify(guidance);
+      } else {
+        guidanceText = 'I understand. How else can I help?';
+      }
+
       const botMessage: Message = {
         id: Date.now() + 1,
-        text: response.data.data.guidance.message || response.data.data.guidance || 'I understand. How else can I help?',
+        text: guidanceText,
         sender: 'bot' as const,
         timestamp: new Date(),
       };

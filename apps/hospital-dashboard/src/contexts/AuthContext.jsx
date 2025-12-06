@@ -10,7 +10,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem("hospital_token"));
 
-  // API base URL
+  // API base URL (already includes /api/v1 from .env)
   const API_BASE_URL =
     import.meta.env.VITE_API_URL || "http://localhost:5001/api/v1";
 

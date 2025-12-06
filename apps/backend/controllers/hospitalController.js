@@ -91,46 +91,31 @@ export const getAllHospitals = asyncHandler(async (req, res) => {
     ];
   }
 
-  let hospitals;
-
-  // If location provided, search by proximity
-  if (lat && lng) {
-    hospitals = await Hospital.find({
-      ...query,
-      location: {
-        $near: {
-          $geometry: {
-            type: "Point",
-            coordinates: [parseFloat(lng), parseFloat(lat)],
-          },
-          $maxDistance: radius * 1000, // Convert km to meters
-        },
-      },
-    })
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit));
-  } else {
-    hospitals = await Hospital.find(query)
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit));
-  }
+  // Get all hospitals matching the query first
+  let hospitals = await Hospital.find(query)
+    .skip((page - 1) * limit)
+    .limit(parseInt(limit) * 10); // Get more to filter by distance
 
   const total = await Hospital.countDocuments(query);
 
-  // Add distance if location provided
+  // Add distance and filter by radius if location provided
   if (lat && lng) {
-    hospitals = hospitals.map((hospital) => {
-      const distance = calculateDistance(
-        parseFloat(lat),
-        parseFloat(lng),
-        hospital.location.lat,
-        hospital.location.lng
-      );
-      return {
-        ...hospital.toObject(),
-        distance: Math.round(distance * 10) / 10, // Round to 1 decimal
-      };
-    });
+    hospitals = hospitals
+      .map((hospital) => {
+        const distance = calculateDistance(
+          parseFloat(lat),
+          parseFloat(lng),
+          hospital.location.lat,
+          hospital.location.lng
+        );
+        return {
+          ...hospital.toObject(),
+          distance: Math.round(distance * 10) / 10, // Round to 1 decimal
+        };
+      })
+      .filter((hospital) => hospital.distance <= radius) // Filter by radius
+      .sort((a, b) => a.distance - b.distance) // Sort by distance
+      .slice(0, parseInt(limit)); // Limit results
   }
 
   sendResponse(

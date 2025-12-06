@@ -275,7 +275,6 @@ const DashboardHome = () => {
             <div className="absolute inset-0 border-4 border-blue-500/30 rounded-full"></div>
             <div className="absolute inset-0 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
           </div>
-          </div>
           <p className="text-gray-300 text-lg font-medium">
             Loading dashboard...
           </p>

@@ -19,9 +19,10 @@ export const getFirstAidGuidance = asyncHandler(async (req, res) => {
     );
   }
 
+  // n8n webhook URL - should be in environment variables
+  const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL || 'https://6580ad4ecf78.ngrok-free.app/webhook-test/609f9961-b8a9-4af4-b5f2-a0208fcb5e31';
+
   try {
-    // n8n webhook URL - should be in environment variables
-    const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL || 'http://localhost:5678/webhook/first-aid';
 
     // Prepare the payload for n8n
     const payload = {
@@ -44,17 +45,41 @@ export const getFirstAidGuidance = asyncHandler(async (req, res) => {
 
     console.log('✅ n8n response received:', response.data);
 
+    // Extract text from various possible response structures
+    let guidanceText;
+    if (typeof response.data === 'string') {
+      guidanceText = response.data;
+    } else if (response.data.output) {
+      guidanceText = typeof response.data.output === 'string' 
+        ? response.data.output 
+        : JSON.stringify(response.data.output);
+    } else if (response.data.response) {
+      guidanceText = response.data.response;
+    } else if (response.data.message) {
+      guidanceText = response.data.message;
+    } else if (response.data.text) {
+      guidanceText = response.data.text;
+    } else {
+      guidanceText = JSON.stringify(response.data);
+    }
+
     sendResponse(
       res,
       RESPONSE_CODES.SUCCESS,
       'First aid guidance retrieved',
       {
-        guidance: response.data.response || response.data.message || response.data,
+        guidance: guidanceText,
         conversationId: response.data.conversationId,
       }
     );
   } catch (error) {
     console.error('❌ n8n chatbot error:', error.message);
+    console.error('❌ Error details:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      url: n8nWebhookUrl,
+    });
     
     // Fallback response if n8n is unavailable
     const fallbackGuidance = generateFallbackGuidance(symptoms);

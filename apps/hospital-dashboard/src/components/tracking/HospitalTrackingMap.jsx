@@ -1,8 +1,8 @@
 import { MapPin, Truck, FirstAid } from 'phosphor-react';
 import React, { useEffect, useRef, useState } from 'react';
 
-import { useAmbulanceTracking } from '../utils/ambulanceTracking';
-import { generateTrackingMapHTML } from '../utils/mapPolyline';
+import { useAmbulanceTracking } from '../../utils/ambulanceTracking';
+import { generateTrackingMapHTML } from '../../utils/mapPolyline';
 
 /**
  * Hospital Tracking Map Component

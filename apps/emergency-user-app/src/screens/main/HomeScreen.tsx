@@ -265,9 +265,8 @@ export default function HomeScreen() {
           );
           if (hospitalResponse.success && hospitalResponse.data) {
             // Handle both array and object responses
-            const hospitalsArray = Array.isArray(hospitalResponse.data) 
-              ? hospitalResponse.data 
-              : (hospitalResponse.data as any).hospitals || [];
+            // Backend returns data.hospitals (nested structure)
+            const hospitalsArray = (hospitalResponse.data as any).hospitals || [];
             
             if (hospitalsArray.length > 0) {
               setNearbyHospitals(hospitalsArray.slice(0, 5)); // Show max 5 hospitals
@@ -281,9 +280,7 @@ export default function HomeScreen() {
                 50 // 50km radius to cover Islamabad
               );
               if (islamabadResponse.success && islamabadResponse.data) {
-                const islamabadHospitals = Array.isArray(islamabadResponse.data)
-                  ? islamabadResponse.data
-                  : (islamabadResponse.data as any).hospitals || [];
+                const islamabadHospitals = (islamabadResponse.data as any).hospitals || [];
                 setNearbyHospitals(islamabadHospitals.slice(0, 5));
                 console.log(`🏥 Showing ${islamabadHospitals.length} Islamabad hospitals as default`);
               }
