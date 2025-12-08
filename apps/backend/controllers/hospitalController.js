@@ -431,3 +431,64 @@ export const getHospitalStats = asyncHandler(async (req, res) => {
     stats
   );
 });
+
+/**
+ * @desc    Get ambulances tracking for hospital
+ * @route   GET /api/v1/hospitals/:id/ambulances/tracking
+ * @access  Private (Hospital)
+ */
+export const getHospitalAmbulancesTracking = asyncHandler(async (req, res) => {
+  const { id: hospitalId } = req.params;
+
+  console.log(`🚑 [TRACKING] Fetching ambulances for hospital: ${hospitalId}`);
+
+  // Import Ambulance model
+  const Ambulance = (await import("../models/Ambulance.js")).default;
+
+  // Get ambulances owned by this hospital
+  const ownAmbulances = await Ambulance.find({
+    hospitalId,
+    status: { $in: ["available", "on_route", "busy"] },
+  })
+    .select("vehicleNumber status currentLocation crew lastUpdate")
+    .lean();
+
+  console.log(`✅ [TRACKING] Found ${ownAmbulances.length} own ambulances`);
+
+  // Get emergencies assigned to this hospital (incoming ambulances)
+  const incomingEmergencies = await Emergency.find({
+    assignedHospital: hospitalId,
+    status: { $in: ["dispatched", "on_route", "arrived"] },
+  })
+    .populate({
+      path: "assignedAmbulance",
+      select: "vehicleNumber status currentLocation crew",
+    })
+    .select("assignedAmbulance patient location estimatedArrival")
+    .lean();
+
+  const incomingAmbulances = incomingEmergencies
+    .filter((em) => em.assignedAmbulance)
+    .map((em) => ({
+      ...em.assignedAmbulance,
+      emergency: {
+        patientName: em.patient?.name,
+        location: em.location,
+        eta: em.estimatedArrival,
+      },
+    }));
+
+  console.log(`✅ [TRACKING] Found ${incomingAmbulances.length} incoming ambulances`);
+
+  sendResponse(
+    res,
+    RESPONSE_CODES.SUCCESS,
+    "Ambulance tracking data retrieved successfully",
+    {
+      ownAmbulances,
+      incomingAmbulances,
+      total: ownAmbulances.length + incomingAmbulances.length,
+      timestamp: new Date().toISOString(),
+    }
+  );
+});

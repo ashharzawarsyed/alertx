@@ -8,6 +8,7 @@ import {
   getHospitalStats,
   approveHospital,
   getPendingHospitals,
+  getHospitalAmbulancesTracking,
 } from "../controllers/hospitalController.js";
 import {
   validateHospital,
@@ -99,6 +100,18 @@ router.put(
   adminOnly,
   validateObjectId("id"),
   approveHospital
+);
+
+/**
+ * @route   GET /api/v1/hospitals/:id/ambulances/tracking
+ * @desc    Get ambulance tracking data for hospital
+ * @access  Private (Hospital)
+ */
+router.get(
+  "/:id/ambulances/tracking",
+  authenticate,
+  validateObjectId("id"),
+  getHospitalAmbulancesTracking
 );
 
 export default router;

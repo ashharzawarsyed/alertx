@@ -481,28 +481,47 @@ export const acceptEmergency = asyncHandler(async (req, res) => {
     );
   }
 
-  console.log(`✅ Hospital assigned: ${nearestHospital.name}`);
+  console.log(`✅ [EMERGENCY] Hospital assigned: ${nearestHospital.name} (ID: ${nearestHospital._id})`);
 
   // Automatically occupy a bed for incoming emergency
   const bedType = emergency.severityLevel === SEVERITY_LEVELS.CRITICAL ? 'icu' : 'emergency';
+  console.log(`🛏️ [BED] Attempting to occupy ${bedType} bed at ${nearestHospital.name}`);
+  console.log(`🛏️ [BED] Available before: ${nearestHospital.availableBeds[bedType]}`);
+  
   if (nearestHospital.availableBeds[bedType] > 0) {
     nearestHospital.availableBeds[bedType] -= 1;
     nearestHospital.lastBedUpdate = new Date();
     await nearestHospital.save();
-    console.log(`🛏️ Auto-occupied ${bedType} bed for emergency ${emergency._id}`);
+    console.log(`✅ [BED] Auto-occupied ${bedType} bed for emergency ${emergency._id}`);
+    console.log(`🛏️ [BED] Available after: ${nearestHospital.availableBeds[bedType]}`);
 
     // Emit bed update via socket
     const io = req.app.get('io');
+    console.log(`📡 [SOCKET] IO instance exists:`, !!io);
+    
     if (io) {
-      io.to(`hospital:${nearestHospital._id}`).emit('bed:updated', {
+      const roomName = `hospital:${nearestHospital._id}`;
+      console.log(`📡 [SOCKET] Emitting bed:updated to room: ${roomName}`);
+      
+      const bedUpdateData = {
         hospitalId: nearestHospital._id,
         availableBeds: nearestHospital.availableBeds,
         bedType,
         action: 'occupied',
         emergencyId: emergency._id,
         lastBedUpdate: nearestHospital.lastBedUpdate,
-      });
+      };
+      
+      console.log(`📡 [SOCKET] Bed update data:`, JSON.stringify(bedUpdateData, null, 2));
+      
+      io.to(roomName).emit('bed:updated', bedUpdateData);
+      
+      console.log(`✅ [SOCKET] bed:updated event emitted to ${roomName}`);
+    } else {
+      console.error(`❌ [SOCKET] IO instance not found on req.app`);
     }
+  } else {
+    console.warn(`⚠️ [BED] No ${bedType} beds available at ${nearestHospital.name}`);
   }
 
   // Accept emergency
@@ -561,8 +580,11 @@ export const acceptEmergency = asyncHandler(async (req, res) => {
 
   // Notify hospital about incoming emergency
   const io = req.app.get('io');
+  console.log(`📡 [HOSPITAL NOTIFY] Preparing to notify hospital ${nearestHospital._id}`);
+  
   if (io) {
-    io.to(`hospital:${nearestHospital._id}`).emit('emergency:incoming', {
+    const roomName = `hospital:${nearestHospital._id}`;
+    const emergencyData = {
       emergency: {
         id: emergency._id,
         patient: emergency.patient,
@@ -570,7 +592,7 @@ export const acceptEmergency = asyncHandler(async (req, res) => {
         severity: emergency.severityLevel,
         triageScore: emergency.triageScore,
         location: emergency.location,
-        estimatedArrival: '15-20 minutes', // You can calculate this based on distance
+        estimatedArrival: '15-20 minutes',
       },
       driver: {
         name: driver.name,
@@ -579,12 +601,28 @@ export const acceptEmergency = asyncHandler(async (req, res) => {
       },
       reservedBedType: bedType,
       timestamp: new Date(),
-    });
+    };
+    
+    console.log(`📡 [HOSPITAL NOTIFY] Emitting emergency:incoming to room: ${roomName}`);
+    console.log(`📡 [HOSPITAL NOTIFY] Data:`, JSON.stringify(emergencyData, null, 2));
+    
+    io.to(roomName).emit('emergency:incoming', emergencyData);
+    
+    console.log(`✅ [HOSPITAL NOTIFY] emergency:incoming emitted to ${roomName}`);
+    
+    // Also check how many clients are in this room
+    const clientsInRoom = await io.in(roomName).allSockets();
+    console.log(`👥 [HOSPITAL NOTIFY] Clients in room ${roomName}:`, clientsInRoom.size);
+    if (clientsInRoom.size === 0) {
+      console.warn(`⚠️ [HOSPITAL NOTIFY] No clients connected to room ${roomName}!`);
+    }
+  } else {
+    console.error(`❌ [HOSPITAL NOTIFY] IO instance not found!`);
   }
 
-  console.log(`✅ Emergency ${emergency._id} accepted by driver ${driver.name}`);
-  console.log(`📡 Socket notification sent to patient ${emergency.patient._id}`);
-  console.log(`🏥 Hospital ${nearestHospital.name} notified of incoming emergency`);
+  console.log(`✅ [EMERGENCY] Emergency ${emergency._id} accepted by driver ${driver.name}`);
+  console.log(`📡 [PATIENT] Socket notification sent to patient ${emergency.patient._id}`);
+  console.log(`🏥 [HOSPITAL] Hospital ${nearestHospital.name} notified of incoming emergency`);
 
   sendResponse(res, RESPONSE_CODES.SUCCESS, "Emergency accepted successfully", {
     emergency,

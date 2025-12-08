@@ -17,8 +17,10 @@ const server = app.listen(PORT, "0.0.0.0", () => {
   🔗 Emulator: http://10.0.2.2:${PORT}
   `);
   
-  // Initialize Socket.IO server
-  initializeSocket(server);
+  // Initialize Socket.IO server and attach to app
+  const io = initializeSocket(server);
+  app.set('io', io);
+  console.log("✅ [SOCKET] IO instance attached to Express app");
   
   // Start the emergency timeout scheduler
   startScheduler();

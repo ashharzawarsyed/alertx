@@ -109,7 +109,7 @@ const LiveTracking = () => {
   const [hospital, setHospital] = useState(null);
   const [selectedAmbulance, setSelectedAmbulance] = useState(null);
   const [showInfoPanel, setShowInfoPanel] = useState(false);
-  const [mapCenter, setMapCenter] = useState({ lat: 40.7128, lng: -74.006 });
+  const [mapCenter, setMapCenter] = useState({ lat: 33.7426, lng: 72.7847 });
   const [mapZoom, setMapZoom] = useState(12);
   const [statistics, setStatistics] = useState({
     total: 0,
@@ -118,6 +118,8 @@ const LiveTracking = () => {
     critical: 0,
   });
   const [connectionStatus, setConnectionStatus] = useState("disconnected");
+  const [activeEmergency, setActiveEmergency] = useState(null);
+  const [hospitalLocation, setHospitalLocation] = useState(null);
 
   const mapRef = useRef(null);
 
@@ -132,20 +134,129 @@ const LiveTracking = () => {
         const hospitalData = JSON.parse(localStorage.getItem("hospital_data"));
         const token = localStorage.getItem("hospital_token");
 
+        console.log("🏥 [TRACKING] Initializing tracking...");
+        console.log("🏥 [TRACKING] Hospital data:", hospitalData);
+        console.log("🏥 [TRACKING] Token exists:", !!token);
+
         if (!hospitalData || !token) {
-          console.error("No hospital data found");
+          console.error("❌ [TRACKING] No hospital data or token found");
+          console.error("❌ [TRACKING] Hospital data:", hospitalData);
+          console.error("❌ [TRACKING] Token:", !!token);
           return;
         }
 
         setHospital(hospitalData);
-        setMapCenter({
-          lat: hospitalData.coordinates?.latitude || 40.7128,
-          lng: hospitalData.coordinates?.longitude || -74.006,
-        });
+        
+        // Handle different coordinate formats from backend
+        // MongoDB stores as {type: "Point", coordinates: [lng, lat]}
+        let lat, lng;
+        
+        if (hospitalData.location?.coordinates && Array.isArray(hospitalData.location.coordinates)) {
+          // MongoDB GeoJSON format: [longitude, latitude]
+          lng = hospitalData.location.coordinates[0];
+          lat = hospitalData.location.coordinates[1];
+        } else if (hospitalData.coordinates?.latitude && hospitalData.coordinates?.longitude) {
+          lat = hospitalData.coordinates.latitude;
+          lng = hospitalData.coordinates.longitude;
+        } else if (hospitalData.latitude && hospitalData.longitude) {
+          lat = hospitalData.latitude;
+          lng = hospitalData.longitude;
+        } else {
+          // Fallback to POF Hospital
+          lat = 33.7500;
+          lng = 72.7847;
+        }
+        
+        console.log("📍 [TRACKING] Hospital location data:", hospitalData.location);
+        console.log("📍 [TRACKING] Extracted coordinates:", { lat, lng });
+        console.log("📍 [TRACKING] Map will center at:", { lat, lng });
+        
+        const hospitalPos = { lat, lng };
+        setHospitalLocation(hospitalPos);
+        setMapCenter(hospitalPos);
 
         // Connect to tracking service
-        trackingService.connect(hospitalData._id, token);
+        const hospitalId = hospitalData._id || hospitalData.id;
+        console.log("🔌 [TRACKING] Connecting to socket with hospital ID:", hospitalId);
+        console.log("🔌 [TRACKING] Hospital Name:", hospitalData.name);
+        console.log("⚠️ [TRACKING] IMPORTANT: Make sure you're logged in as the correct hospital!");
+        console.log("⚠️ [TRACKING] Emergencies will only appear if assigned to hospital ID:", hospitalId);
+        
+        trackingService.connect(hospitalId, token);
         setConnectionStatus("connected");
+        console.log("✅ [TRACKING] Socket connection initiated");
+
+        // IMPORTANT: Wait for socket to connect before setting up listeners
+        trackingService.socket.on('connect', () => {
+          console.log('🔌 [TRACKING] Socket connected, joining hospital room...');
+          trackingService.socket.emit('hospital:join', hospitalId);
+          console.log(`📡 [TRACKING] Emitted hospital:join for: ${hospitalId}`);
+        });
+
+        // Listen for room join confirmation
+        trackingService.socket.on('hospital:joined', (data) => {
+          console.log('✅ [TRACKING] Successfully joined hospital room:', data);
+        });
+
+        // Listen for emergency assignments
+        trackingService.socket.on('emergency:incoming', (data) => {
+          console.log('🚨 [TRACKING] ========================================');
+          console.log('🚨 [TRACKING] NEW EMERGENCY INCOMING!');
+          console.log('🚨 [TRACKING] ========================================');
+          console.log('🚨 [TRACKING] Full data:', JSON.stringify(data, null, 2));
+          console.log('🚨 [TRACKING] Emergency ID:', data.emergency?.id);
+          console.log('🚨 [TRACKING] Patient:', data.emergency?.patient?.name);
+          console.log('🚨 [TRACKING] Severity:', data.emergency?.severity);
+          console.log('🚨 [TRACKING] Ambulance:', data.driver?.ambulanceNumber);
+          console.log('🚨 [TRACKING] Driver:', data.driver?.name);
+          console.log('🚨 [TRACKING] Reserved Bed Type:', data.reservedBedType);
+          console.log('🚨 [TRACKING] My Hospital ID:', hospitalId);
+          console.log('🚨 [TRACKING] ========================================');
+          
+          // Refresh ambulance data
+          trackingService.getAmbulances(hospitalId).then(responseData => {
+            console.log('✅ [TRACKING] Ambulances refreshed after emergency');
+            console.log('✅ [TRACKING] Own ambulances:', responseData.ownAmbulances?.length || 0);
+            console.log('✅ [TRACKING] Incoming ambulances:', responseData.incomingAmbulances?.length || 0);
+            const allAmbulances = [
+              ...(responseData.ownAmbulances || []),
+              ...(responseData.incomingAmbulances || []),
+            ];
+            setAmbulances(allAmbulances);
+            updateStatistics(allAmbulances);
+          }).catch(err => console.error('❌ [TRACKING] Error refreshing ambulances:', err));
+        });
+
+        // Listen for emergency completion
+        trackingService.socket.on('emergency:completed', (data) => {
+          console.log('✅ [TRACKING] Emergency completed:', data);
+          // Refresh ambulance data
+          trackingService.getAmbulances(hospitalId).then(responseData => {
+            const allAmbulances = [
+              ...(responseData.ownAmbulances || []),
+              ...(responseData.incomingAmbulances || []),
+            ];
+            setAmbulances(allAmbulances);
+            updateStatistics(allAmbulances);
+          }).catch(err => console.error('❌ [TRACKING] Error refreshing ambulances:', err));
+        });
+
+        // Listen for ambulance location updates
+        trackingService.socket.on('ambulance:location:update', (data) => {
+          console.log('📍 [TRACKING] Ambulance location update:', data);
+          setAmbulances(prev => prev.map(amb => 
+            amb._id === data.ambulanceId 
+              ? { ...amb, currentLocation: data.location }
+              : amb
+          ));
+        });
+
+        // If socket is already connected, join immediately
+        if (trackingService.socket.connected) {
+          console.log('🔌 [TRACKING] Socket already connected, joining hospital room...');
+          trackingService.socket.emit('hospital:join', hospitalId);
+          console.log(`📡 [TRACKING] Emitted hospital:join for: ${hospitalId}`);
+        }
 
         // Fetch initial ambulance data
         const data = await trackingService.getAmbulances(hospitalData._id);
@@ -247,6 +358,41 @@ const LiveTracking = () => {
       trackingService.disconnect();
     };
   }, [isLoaded]);
+
+  // Dynamic map centering based on active emergencies
+  useEffect(() => {
+    const activeAmbulances = ambulances.filter(amb => 
+      amb.status === 'on_route' || amb.status === 'busy'
+    );
+
+    if (activeAmbulances.length > 0 && mapRef.current) {
+      // Center on active ambulances
+      const bounds = new window.google.maps.LatLngBounds();
+      
+      // Add hospital location
+      if (hospitalLocation) {
+        bounds.extend(hospitalLocation);
+      }
+      
+      // Add all active ambulances
+      activeAmbulances.forEach(amb => {
+        if (amb.currentLocation) {
+          bounds.extend({
+            lat: amb.currentLocation.coordinates[1],
+            lng: amb.currentLocation.coordinates[0],
+          });
+        }
+      });
+
+      mapRef.current.fitBounds(bounds);
+      console.log('📍 [TRACKING] Centered map on active ambulances');
+    } else if (hospitalLocation && mapRef.current) {
+      // No active emergencies, center on hospital
+      setMapCenter(hospitalLocation);
+      setMapZoom(14);
+      console.log('📍 [TRACKING] Centered map on hospital');
+    }
+  }, [ambulances, hospitalLocation]);
 
   const updateStatistics = (ambulanceList) => {
     const stats = {
@@ -406,21 +552,27 @@ const LiveTracking = () => {
         }}
       >
         {/* Hospital Marker */}
-        {hospital && hospital.coordinates && (
+        {hospital && mapCenter && (
           <Marker
-            position={{
-              lat: hospital.coordinates.latitude,
-              lng: hospital.coordinates.longitude,
-            }}
+            position={mapCenter}
             icon={{
-              path: window.google.maps.SymbolPath.CIRCLE,
-              scale: 12,
-              fillColor: "#a855f7",
-              fillOpacity: 1,
-              strokeColor: "#ffffff",
-              strokeWeight: 3,
+              url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+                  <circle cx="24" cy="24" r="20" fill="#DC2626" stroke="white" stroke-width="3"/>
+                  <path d="M24 12 L24 36 M12 24 L36 24" stroke="white" stroke-width="4" stroke-linecap="round"/>
+                </svg>
+              `),
+              scaledSize: new window.google.maps.Size(48, 48),
+              anchor: new window.google.maps.Point(24, 24),
             }}
-            title={hospital.name}
+            title={hospital.name || 'Hospital'}
+            label={{
+              text: hospital.name || 'Hospital',
+              color: '#DC2626',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              className: 'hospital-marker-label'
+            }}
           />
         )}
 
@@ -429,7 +581,9 @@ const LiveTracking = () => {
           if (!ambulance.currentLocation) return null;
 
           const isOwn = ambulance.hospitalId === hospital?._id;
-          const color = isOwn ? "#3b82f6" : "#10b981";
+          const color = isOwn ? "#3B82F6" : "#10B981";
+          const statusColor = ambulance.status === 'on_route' ? '#F59E0B' : 
+                             ambulance.status === 'busy' ? '#DC2626' : '#10B981';
 
           return (
             <Marker
@@ -439,17 +593,18 @@ const LiveTracking = () => {
                 lng: ambulance.currentLocation.coordinates[0],
               }}
               icon={{
-                path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
-                fillColor: color,
-                fillOpacity: 1,
-                strokeColor: "#ffffff",
-                strokeWeight: 2,
-                scale: 1.5,
-                anchor: new window.google.maps.Point(12, 22),
-                rotation: ambulance.heading || 0,
+                url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                  <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+                    <circle cx="20" cy="20" r="16" fill="${statusColor}" stroke="white" stroke-width="3"/>
+                    <path d="M12 20 L20 14 L28 20 L20 26 Z" fill="white"/>
+                    <circle cx="20" cy="20" r="4" fill="white"/>
+                  </svg>
+                `),
+                scaledSize: new window.google.maps.Size(40, 40),
+                anchor: new window.google.maps.Point(20, 20),
               }}
               onClick={() => handleMarkerClick(ambulance)}
-              title={`${ambulance.vehicleNumber} - ${ambulance.status}`}
+              title={`${ambulance.vehicleNumber || 'Ambulance'} - ${ambulance.status}`}
             />
           );
         })}

@@ -4,6 +4,13 @@ import { authenticate } from "../middlewares/auth.js";
 
 const router = express.Router();
 
+// Get all patients for a hospital (query param: ?hospitalId=xxx)
+router.get(
+  "/",
+  authenticate,
+  patientController.getAllHospitalPatients
+);
+
 // Get incoming patients for a hospital
 router.get(
   "/hospital/:hospitalId/incoming",

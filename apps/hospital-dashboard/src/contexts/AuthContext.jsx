@@ -20,6 +20,7 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     localStorage.removeItem("hospital_token");
     localStorage.removeItem("hospital_data");
+    console.log("🚪 [AUTH] Logged out, cleared all data");
 
     // Redirect to signin page
     navigate("/auth/signin");
@@ -61,10 +62,13 @@ export const AuthProvider = ({ children }) => {
           if (data.success && data.data) {
             // Handle both nested and flat response structures
             const hospitalData = data.data.hospital || data.data;
-            setHospital({
+            const hospitalObject = {
               ...hospitalData,
               id: hospitalData._id || hospitalData.id || validHospitalId,
-            });
+            };
+            setHospital(hospitalObject);
+            // Save to localStorage for other components
+            localStorage.setItem("hospital_data", JSON.stringify(hospitalObject));
             console.log("Hospital set successfully:", hospitalData.name);
           }
         } else {
@@ -72,21 +76,25 @@ export const AuthProvider = ({ children }) => {
             `Hospital API endpoint returned ${response.status}. Using basic info.`
           );
           // Fallback: use hospitalId with minimal info
-          setHospital({
+          const fallbackHospital = {
             _id: validHospitalId,
             id: validHospitalId,
             name: "Hospital",
-          });
+          };
+          setHospital(fallbackHospital);
+          localStorage.setItem("hospital_data", JSON.stringify(fallbackHospital));
         }
       } catch (error) {
         console.error("Error fetching hospital details:", error);
         // Set minimal hospital object on error
         if (hospitalId) {
-          setHospital({
+          const errorHospital = {
             _id: hospitalId,
             id: hospitalId,
             name: "Hospital",
-          });
+          };
+          setHospital(errorHospital);
+          localStorage.setItem("hospital_data", JSON.stringify(errorHospital));
         }
       }
     },
@@ -180,14 +188,16 @@ export const AuthProvider = ({ children }) => {
         } else {
           // If no separate hospital ID, use user data as hospital data
           console.warn("No hospitalInfo.hospitalId found, using fallback");
-          setHospital({
+          const fallbackHospital = {
             _id: data.data.user._id,
             id: data.data.user._id,
             name: data.data.user.name,
             email: data.data.user.email,
             phone: data.data.user.phone,
             ...data.data.user.hospitalInfo,
-          });
+          };
+          setHospital(fallbackHospital);
+          localStorage.setItem("hospital_data", JSON.stringify(fallbackHospital));
         }
 
         return { success: true, user: data.data.user };

@@ -30,17 +30,17 @@ const CrossPlatformMap = React.forwardRef<any, CrossPlatformMapProps>(
   ({ initialRegion, markers = [], polylineCode = '', style, onMapReady }, ref) => {
     const [isLoading, setIsLoading] = useState(true);
     const hasInitialized = useRef(false);
+    const webViewRef = useRef<any>(null);
+    const prevMarkersRef = useRef<MapMarker[]>([]);
     
     // Get Google Maps API key from env
     const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || Constants.expoConfig?.extra?.googleMapsApiKey || "";
 
-    // Build markers parameter for Google Maps Static API
-    const markerParams = markers
-      .map(
-        (marker, index) =>
-          `markers=color:${marker.color || "red"}%7Clabel:${index + 1}%7C${marker.latitude},${marker.longitude}`
-      )
-      .join("&");
+    // Create stable markers key to prevent unnecessary re-renders
+    const markersKey = useMemo(() => 
+      JSON.stringify(markers.map(m => `${m.latitude},${m.longitude},${m.icon}`)),
+      [markers]
+    );
 
     // Generate HTML for interactive Google Maps using WebView - Memoized to prevent re-renders
     const mapHTML = useMemo(() => {
@@ -71,34 +71,43 @@ const CrossPlatformMap = React.forwardRef<any, CrossPlatformMapProps>(
 <body>
   <div id="map"></div>
   <script>
-    // SVG icon generator with improved icons
+    // SVG icon generator with improved compact icons
     function createMarkerIcon(iconName, color) {
-      let iconPath = '';
-      let viewBox = '0 0 24 24';
+      let svg = '';
       
       switch(iconName) {
         case 'ambulance':
-          // Simplified ambulance icon
-          iconPath = 'M18 18.5C18 19.33 17.33 20 16.5 20S15 19.33 15 18.5 15.67 17 16.5 17 18 17.67 18 18.5M19.5 9.5L21.46 12H17V9.5H19.5M6 18.5C6 19.33 5.33 20 4.5 20S3 19.33 3 18.5 3.67 17 4.5 17 6 17.67 6 18.5M20 8H17V4H3C1.9 4 1 4.9 1 6V17H3C3 18.66 4.34 20 6 20S9 18.66 9 17H15C15 18.66 16.34 20 18 20S21 18.66 21 17H23V12L20 8M8 13H5V10H8V13Z';
+          svg = \`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="20" height="20">
+            <circle cx="16" cy="16" r="15" fill="\${color}" stroke="white" stroke-width="2"/>
+            <path d="M16 10v12M10 16h12" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M19 12h2l2 3h-4z" fill="white"/>
+          </svg>\`;
           break;
         case 'user-injured':
-          // Person with medical cross
-          iconPath = 'M12 2C13.1 2 14 2.9 14 4S13.1 6 12 6 10 5.1 10 4 10.9 2 12 2M15.89 8.11C15.5 7.72 14.83 7 13.53 7H10.47C9.17 7 8.5 7.72 8.11 8.11C7.86 8.36 7.73 8.69 7.73 9.03V20C7.73 21.1 8.63 22 9.73 22S11.73 21.1 11.73 20V16H12.27V20C12.27 21.1 13.17 22 14.27 22S16.27 21.1 16.27 20V9.03C16.27 8.69 16.14 8.36 15.89 8.11M17 2V5H19V7H17V10H15V7H13V5H15V2H17Z';
+        case 'patient':
+          svg = \`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="18" height="18">
+            <circle cx="16" cy="16" r="15" fill="\${color}" stroke="white" stroke-width="2"/>
+            <circle cx="16" cy="12" r="3" fill="white"/>
+            <path d="M11 20c0-2.5 2-4 5-4s5 1.5 5 4v2H11z" fill="white"/>
+          </svg>\`;
           break;
         case 'hospital':
-          // Hospital building with cross
-          iconPath = 'M2 22V6L12 2L22 6V22H14V17H10V22H2M12 8C12.55 8 13 8.45 13 9V10H14C14.55 10 15 10.45 15 11C15 11.55 14.55 12 14 12H13V13C13 13.55 12.55 14 12 14C11.45 14 11 13.55 11 13V12H10C9.45 12 9 11.55 9 11C9 10.45 9.45 10 10 10H11V9C11 8.45 11.45 8 12 8Z';
+          svg = \`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="22" height="22">
+            <circle cx="16" cy="16" r="15" fill="\${color}" stroke="white" stroke-width="2"/>
+            <path d="M16 10v12M10 16h12" stroke="white" stroke-width="3" stroke-linecap="round"/>
+          </svg>\`;
+          break;
+        case 'pickup-point':
+          svg = \`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="16" height="16">
+            <circle cx="16" cy="16" r="14" fill="\${color}" stroke="white" stroke-width="2.5" opacity="0.7"/>
+            <circle cx="16" cy="16" r="4" fill="white"/>
+          </svg>\`;
           break;
         default:
-          // Circle fallback
-          iconPath = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z';
+          svg = \`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="18" height="18">
+            <circle cx="16" cy="16" r="14" fill="\${color}" stroke="white" stroke-width="2"/>
+          </svg>\`;
       }
-      
-      const svg = \`
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="\${viewBox}" width="28" height="28">
-          <path fill="\${color}" d="\${iconPath}" stroke="#fff" stroke-width="1.5"/>
-        </svg>
-      \`;
       
       return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
     }
@@ -152,13 +161,41 @@ const CrossPlatformMap = React.forwardRef<any, CrossPlatformMapProps>(
 </body>
 </html>
       `;
-    }, [initialRegion, markers, polylineCode, GOOGLE_MAPS_API_KEY]); // Only regenerate when these change
+    }, [markersKey, polylineCode, GOOGLE_MAPS_API_KEY]); // Only regenerate when these change
+
+    // Update markers dynamically without reloading entire map
+    React.useEffect(() => {
+      if (hasInitialized.current && webViewRef.current) {
+        const markersChanged = JSON.stringify(prevMarkersRef.current) !== JSON.stringify(markers);
+        if (markersChanged) {
+          const markersJS = JSON.stringify(markers.map(m => ({
+            lat: m.latitude,
+            lng: m.longitude,
+            title: m.title,
+            color: m.color || '#dc2626',
+            icon: m.icon || 'circle'
+          })));
+          
+          webViewRef.current.injectJavaScript(`
+            if (window.updateMarkers) {
+              window.updateMarkers(${markersJS});
+            }
+            true;
+          `);
+          prevMarkersRef.current = markers;
+        }
+      }
+    }, [markers]);
 
     // Use WebView for interactive map
     return (
       <View style={[{ flex: 1 }, style]}>
         <WebView
-          ref={ref}
+          ref={(r) => {
+            webViewRef.current = r;
+            if (typeof ref === 'function') ref(r);
+            else if (ref) ref.current = r;
+          }}
           source={{ html: mapHTML }}
           style={{ flex: 1 }}
           onLoadEnd={() => {

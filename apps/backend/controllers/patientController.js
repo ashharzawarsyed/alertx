@@ -3,6 +3,57 @@ import Ambulance from "../models/Ambulance.js";
 import { RESPONSE_CODES } from "../utils/constants.js";
 
 /**
+ * Get all patients for a hospital (query param version)
+ */
+const getAllHospitalPatients = async (req, res) => {
+  try {
+    const { hospitalId } = req.query;
+
+    // Validate hospital ID
+    if (!hospitalId || hospitalId === "undefined") {
+      return res.status(400).json({
+        success: false,
+        message: "Hospital ID is required",
+        code: RESPONSE_CODES.VALIDATION_ERROR,
+      });
+    }
+
+    console.log(`📋 [PATIENTS] Fetching all patients for hospital: ${hospitalId}`);
+
+    // Get all patients for the hospital (admitted, incoming, etc.)
+    const patients = await Patient.find({
+      hospitalId,
+      status: { $in: ["admitted", "incoming", "en-route", "in-treatment"] },
+    })
+      .populate("ambulanceId", "vehicleNumber status currentLocation")
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    console.log(`✅ [PATIENTS] Found ${patients.length} patients for hospital ${hospitalId}`);
+
+    res.json({
+      success: true,
+      message: "Hospital patients retrieved successfully",
+      data: {
+        patients,
+        total: patients.length,
+        admitted: patients.filter(p => p.status === "admitted").length,
+        incoming: patients.filter(p => p.status === "incoming" || p.status === "en-route").length,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("❌ [PATIENTS] Error fetching hospital patients:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch hospital patients",
+      error: error.message,
+      code: RESPONSE_CODES.SERVER_ERROR,
+    });
+  }
+};
+
+/**
  * Get all incoming patients for a hospital
  */
 const getIncomingPatients = async (req, res) => {
@@ -244,6 +295,7 @@ const getCriticalAlerts = async (req, res) => {
 };
 
 export default {
+  getAllHospitalPatients,
   getIncomingPatients,
   createIncomingPatient,
   updatePatientStatus,

@@ -126,15 +126,24 @@ const DashboardHome = () => {
 
   // Setup Socket.IO for real-time updates
   useEffect(() => {
-    if (!hospitalId || !token) return;
+    if (!hospitalId || !token) {
+      console.warn("⚠️ [DASHBOARD] Missing hospitalId or token:", { hospitalId: !!hospitalId, token: !!token });
+      return;
+    }
 
+    console.log("🏥 [DASHBOARD] Setting up Socket.IO connection");
+    console.log("🏥 [DASHBOARD] Hospital ID:", hospitalId);
+    
     // Connect to Socket.IO
     socketService.connect(hospitalId, token);
     socketService.joinHospitalRoom(hospitalId);
+    
+    console.log("✅ [DASHBOARD] Socket connection initiated");
 
     // Listen for bed updates
+    console.log("📡 [DASHBOARD] Registering bed update listener");
     socketService.onBedUpdate((data) => {
-      console.log("🛏️ Bed updated:", data);
+      console.log("🛏️ [DASHBOARD] Bed updated event received:", data);
       setHospitalData((prev) => ({
         ...prev,
         availableBeds: data.availableBeds,
@@ -151,8 +160,9 @@ const DashboardHome = () => {
     });
 
     // Listen for incoming emergencies
+    console.log("📡 [DASHBOARD] Registering emergency incoming listener");
     socketService.onEmergencyIncoming((data) => {
-      console.log("🚨 Incoming emergency:", data);
+      console.log("🚨 [DASHBOARD] Incoming emergency event received:", data);
       
       // Add to emergency queue
       setIncomingPatients((prev) => [{

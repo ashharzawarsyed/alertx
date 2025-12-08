@@ -40,6 +40,7 @@ export const initializeSocket = (server) => {
   // Connection handling
   io.on("connection", (socket) => {
     console.log(`User connected: ${socket.userId} (${socket.userRole})`);
+    console.log(`🔍 [SOCKET] User role check: "${socket.userRole}" === "hospital"? ${socket.userRole === "hospital"}`);
 
     // Join user-specific room
     socket.join(`user_${socket.userId}`);
@@ -58,8 +59,9 @@ export const initializeSocket = (server) => {
     }
 
     // Hospital staff events
-    if (socket.userRole === "hospital_staff") {
+    if (socket.userRole === "hospital") {
       handleHospitalEvents(socket);
+      console.log(`✅ [SOCKET] Hospital user ${socket.userId} - handleHospitalEvents enabled`);
     }
 
     // Admin events
@@ -73,7 +75,10 @@ export const initializeSocket = (server) => {
     });
   });
 
-  console.log("Socket.io server initialized");
+  console.log("✅ [SOCKET] Socket.io server initialized");
+  console.log("📡 [SOCKET] Transports: websocket, polling");
+  console.log("📡 [SOCKET] CORS: enabled for all origins (development)");
+  
   return io;
 };
 
@@ -232,23 +237,34 @@ const handlePatientEvents = (socket) => {
  * Handle hospital staff events
  */
 const handleHospitalEvents = (socket) => {
+  console.log(`🏥 [HOSPITAL] Setting up hospital event handlers for user: ${socket.userId}`);
+  
   // Join hospital-specific room
-  socket.on("hospital:join", (data) => {
-    const { hospitalId } = data;
-    console.log(`🏥 Hospital staff joining hospital room: ${hospitalId}`);
-    socket.join(`hospital_${hospitalId}`);
+  socket.on("hospital:join", (hospitalId) => {
+    console.log(`🏥 [HOSPITAL] Staff ${socket.userId} joining room: hospital:${hospitalId}`);
+    socket.join(`hospital:${hospitalId}`);
+    
+    // Confirm join
+    socket.emit("hospital:joined", {
+      hospitalId,
+      message: "Successfully joined hospital room",
+      timestamp: new Date(),
+    });
+    
+    console.log(`✅ [HOSPITAL] Staff ${socket.userId} joined hospital:${hospitalId}`);
   });
 
   // Leave hospital room
   socket.on("hospital:leave", (data) => {
     const { hospitalId } = data;
-    console.log(`🏥 Hospital staff leaving hospital room: ${hospitalId}`);
-    socket.leave(`hospital_${hospitalId}`);
+    console.log(`🚪 [HOSPITAL] Staff leaving hospital room: ${hospitalId}`);
+    socket.leave(`hospital:${hospitalId}`);
   });
 
   // Bed availability update
   socket.on("hospital:updateBeds", (data) => {
     const { hospitalId, availableBeds } = data;
+    console.log(`🛏️ [HOSPITAL] Bed update from staff ${socket.userId}:`, { hospitalId, availableBeds });
 
     // Broadcast to all users tracking hospital availability
     io.emit("hospital:bedUpdate", {
@@ -256,6 +272,11 @@ const handleHospitalEvents = (socket) => {
       availableBeds,
       timestamp: new Date(),
     });
+  });
+
+  // Listen for bed updates request
+  socket.on("bed:update", (data) => {
+    console.log(`🛏️ [HOSPITAL] Manual bed update received:`, data);
   });
 };
 
