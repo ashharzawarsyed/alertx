@@ -76,6 +76,12 @@ class SocketService {
     this.listeners.set("emergency:new", callback);
   }
 
+  onEmergencyIncoming(callback) {
+    if (!this.socket) return;
+    this.socket.on("emergency:incoming", callback);
+    this.listeners.set("emergency:incoming", callback);
+  }
+
   onEmergencyUpdate(callback) {
     if (!this.socket) return;
     this.socket.on("emergency:updated", callback);
@@ -86,6 +92,12 @@ class SocketService {
     if (!this.socket) return;
     this.socket.on("emergency:assigned", callback);
     this.listeners.set("emergency:assigned", callback);
+  }
+
+  onEmergencyCompleted(callback) {
+    if (!this.socket) return;
+    this.socket.on("emergency:completed", callback);
+    this.listeners.set("emergency:completed", callback);
   }
 
   // Patient events

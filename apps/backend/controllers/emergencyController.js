@@ -483,9 +483,32 @@ export const acceptEmergency = asyncHandler(async (req, res) => {
 
   console.log(`✅ Hospital assigned: ${nearestHospital.name}`);
 
+  // Automatically occupy a bed for incoming emergency
+  const bedType = emergency.severityLevel === SEVERITY_LEVELS.CRITICAL ? 'icu' : 'emergency';
+  if (nearestHospital.availableBeds[bedType] > 0) {
+    nearestHospital.availableBeds[bedType] -= 1;
+    nearestHospital.lastBedUpdate = new Date();
+    await nearestHospital.save();
+    console.log(`🛏️ Auto-occupied ${bedType} bed for emergency ${emergency._id}`);
+
+    // Emit bed update via socket
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`hospital:${nearestHospital._id}`).emit('bed:updated', {
+        hospitalId: nearestHospital._id,
+        availableBeds: nearestHospital.availableBeds,
+        bedType,
+        action: 'occupied',
+        emergencyId: emergency._id,
+        lastBedUpdate: nearestHospital.lastBedUpdate,
+      });
+    }
+  }
+
   // Accept emergency
   emergency.assignedDriver = req.user.id;
   emergency.assignedHospital = nearestHospital._id;
+  emergency.reservedBedType = bedType; // Store which bed type was reserved
   await emergency.updateStatus(EMERGENCY_STATUS.ACCEPTED);
 
   // Update driver status
@@ -536,8 +559,32 @@ export const acceptEmergency = asyncHandler(async (req, res) => {
     timestamp: new Date(),
   });
 
+  // Notify hospital about incoming emergency
+  const io = req.app.get('io');
+  if (io) {
+    io.to(`hospital:${nearestHospital._id}`).emit('emergency:incoming', {
+      emergency: {
+        id: emergency._id,
+        patient: emergency.patient,
+        symptoms: emergency.symptoms,
+        severity: emergency.severityLevel,
+        triageScore: emergency.triageScore,
+        location: emergency.location,
+        estimatedArrival: '15-20 minutes', // You can calculate this based on distance
+      },
+      driver: {
+        name: driver.name,
+        phone: driver.phone,
+        ambulanceNumber: driver.driverInfo.ambulanceNumber,
+      },
+      reservedBedType: bedType,
+      timestamp: new Date(),
+    });
+  }
+
   console.log(`✅ Emergency ${emergency._id} accepted by driver ${driver.name}`);
   console.log(`📡 Socket notification sent to patient ${emergency.patient._id}`);
+  console.log(`🏥 Hospital ${nearestHospital.name} notified of incoming emergency`);
 
   sendResponse(res, RESPONSE_CODES.SUCCESS, "Emergency accepted successfully", {
     emergency,
@@ -573,7 +620,7 @@ export const updateEmergencyStatus = asyncHandler(async (req, res) => {
 
   await emergency.updateStatus(status, req.user.id);
 
-  // Update driver status if emergency is completed or cancelled
+  // Update driver status and release bed if emergency is completed or cancelled
   if (
     status === EMERGENCY_STATUS.COMPLETED ||
     status === EMERGENCY_STATUS.CANCELLED
@@ -582,6 +629,39 @@ export const updateEmergencyStatus = asyncHandler(async (req, res) => {
       await User.findByIdAndUpdate(emergency.assignedDriver, {
         "driverInfo.status": DRIVER_STATUS.AVAILABLE,
       });
+    }
+
+    // Release reserved bed if it was occupied
+    if (emergency.assignedHospital && emergency.reservedBedType) {
+      const hospital = await Hospital.findById(emergency.assignedHospital);
+      if (hospital) {
+        const bedType = emergency.reservedBedType;
+        
+        // Only release if not manually managed (can add a flag for this later)
+        if (status === EMERGENCY_STATUS.CANCELLED) {
+          // Auto-release on cancellation
+          hospital.availableBeds[bedType] = (hospital.availableBeds[bedType] || 0) + 1;
+          hospital.lastBedUpdate = new Date();
+          await hospital.save();
+          
+          console.log(`🛏️ Auto-released ${bedType} bed for cancelled emergency ${emergency._id}`);
+          
+          // Emit bed update via socket
+          const io = req.app.get('io');
+          if (io) {
+            io.to(`hospital:${hospital._id}`).emit('bed:updated', {
+              hospitalId: hospital._id,
+              availableBeds: hospital.availableBeds,
+              bedType,
+              action: 'released',
+              reason: 'emergency_cancelled',
+              emergencyId: emergency._id,
+              lastBedUpdate: hospital.lastBedUpdate,
+            });
+          }
+        }
+        // For completed emergencies, staff will manually manage bed after patient discharge
+      }
     }
   }
 
