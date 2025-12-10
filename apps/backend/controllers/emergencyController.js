@@ -1423,3 +1423,219 @@ export const rejectEmergency = asyncHandler(async (req, res) => {
   }
 });
 
+/**
+ * @desc    Get driver's active emergency
+ * @route   GET /api/v1/emergencies/driver/active
+ * @access  Private (Driver)
+ */
+export const getDriverActiveEmergency = asyncHandler(async (req, res) => {
+  const driverId = req.user.id;
+
+  console.log(`🔍 [DRIVER ACTIVE] Fetching active emergency for driver: ${driverId}`);
+
+  // Find active emergency assigned to this driver
+  const activeEmergency = await Emergency.findOne({
+    assignedDriver: driverId,
+    status: { $in: [EMERGENCY_STATUS.ACCEPTED, EMERGENCY_STATUS.IN_PROGRESS] },
+  })
+    .populate('patient', 'name phone medicalProfile')
+    .populate('assignedAmbulance', 'vehicleNumber type')
+    .populate('assignedHospital', 'name address location beds')
+    .populate('assignedDriver', 'name phone')
+    .sort({ createdAt: -1 });
+
+  if (!activeEmergency) {
+    console.log('✅ [DRIVER ACTIVE] No active emergency found');
+    return sendResponse(
+      res,
+      RESPONSE_CODES.SUCCESS,
+      "No active emergency",
+      { activeEmergency: null }
+    );
+  }
+
+  console.log(`✅ [DRIVER ACTIVE] Found active emergency: ${activeEmergency._id}`);
+
+  sendResponse(
+    res,
+    RESPONSE_CODES.SUCCESS,
+    "Active emergency retrieved",
+    { activeEmergency }
+  );
+});
+
+/**
+ * @desc    Force complete emergency (emergency button for stuck emergencies)
+ * @route   PUT /api/v1/emergencies/:id/force-complete
+ * @access  Private (Driver or Patient)
+ */
+export const forceCompleteEmergency = asyncHandler(async (req, res) => {
+  const { id: emergencyId } = req.params;
+  const { reason } = req.body;
+
+  console.log(`🚨 [FORCE COMPLETE] Emergency ${emergencyId} by user ${req.user.id}`);
+
+  const emergency = await Emergency.findById(emergencyId)
+    .populate('patient')
+    .populate('assignedDriver')
+    .populate('assignedHospital');
+
+  if (!emergency) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.NOT_FOUND,
+      "Emergency not found"
+    );
+  }
+
+  // Verify user is involved in this emergency
+  const isPatient = emergency.patient._id.toString() === req.user.id;
+  const isDriver = emergency.assignedDriver?._id.toString() === req.user.id;
+
+  if (!isPatient && !isDriver) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.FORBIDDEN,
+      "You are not authorized to complete this emergency"
+    );
+  }
+
+  // Only allow for accepted or in_progress emergencies
+  if (![EMERGENCY_STATUS.ACCEPTED, EMERGENCY_STATUS.IN_PROGRESS].includes(emergency.status)) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.BAD_REQUEST,
+      `Cannot force complete emergency with status: ${emergency.status}`
+    );
+  }
+
+  console.log(`✅ [FORCE COMPLETE] Marking emergency as completed`);
+
+  // Update emergency status
+  emergency.status = EMERGENCY_STATUS.COMPLETED;
+  emergency.completedAt = new Date();
+  emergency.forceCompleted = true;
+  emergency.forceCompleteReason = reason || 'Emergency force completed due to app crash or technical issue';
+  emergency.forceCompletedBy = req.user.id;
+  
+  await emergency.save();
+
+  // Notify both patient and driver
+  try {
+    if (emergency.patient) {
+      emitToUser(emergency.patient._id.toString(), "emergency:completed", {
+        emergencyId: emergency._id,
+        message: 'Emergency has been marked as completed',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    if (emergency.assignedDriver) {
+      emitToUser(emergency.assignedDriver._id.toString(), "emergency:completed", {
+        emergencyId: emergency._id,
+        message: 'Emergency has been marked as completed',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  } catch (error) {
+    console.error("⚠️ Failed to send notifications:", error.message);
+  }
+
+  console.log(`✅ [FORCE COMPLETE] Emergency ${emergencyId} completed successfully`);
+
+  sendResponse(
+    res,
+    RESPONSE_CODES.SUCCESS,
+    "Emergency completed successfully",
+    { emergency }
+  );
+});
+
+/**
+ * @desc    Force cancel emergency for in-progress emergencies
+ * @route   PUT /api/v1/emergencies/:id/force-cancel
+ * @access  Private (Driver or Patient)
+ */
+export const forceCancelEmergency = asyncHandler(async (req, res) => {
+  const { id: emergencyId } = req.params;
+  const { reason } = req.body;
+
+  console.log(`🚫 [FORCE CANCEL] Emergency ${emergencyId} by user ${req.user.id}`);
+
+  const emergency = await Emergency.findById(emergencyId)
+    .populate('patient')
+    .populate('assignedDriver')
+    .populate('assignedHospital');
+
+  if (!emergency) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.NOT_FOUND,
+      "Emergency not found"
+    );
+  }
+
+  // Verify user is involved in this emergency
+  const isPatient = emergency.patient._id.toString() === req.user.id;
+  const isDriver = emergency.assignedDriver?._id.toString() === req.user.id;
+
+  if (!isPatient && !isDriver) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.FORBIDDEN,
+      "You are not authorized to cancel this emergency"
+    );
+  }
+
+  console.log(`✅ [FORCE CANCEL] Cancelling emergency`);
+
+  // Release reserved bed if exists
+  if (emergency.assignedHospital && emergency.reservedBedType) {
+    const bedField = `beds.${emergency.reservedBedType}.available`;
+    await Hospital.findByIdAndUpdate(
+      emergency.assignedHospital._id,
+      { $inc: { [bedField]: 1 } }
+    );
+    console.log(`✅ [FORCE CANCEL] Released ${emergency.reservedBedType} bed`);
+  }
+
+  // Update emergency status
+  emergency.status = EMERGENCY_STATUS.CANCELLED;
+  emergency.cancelledAt = new Date();
+  emergency.cancellationReason = reason || 'Emergency cancelled due to app crash or technical issue';
+  emergency.cancelledBy = req.user.id;
+  emergency.forceCancelled = true;
+  
+  await emergency.save();
+
+  // Notify both patient and driver
+  try {
+    if (emergency.patient) {
+      emitToUser(emergency.patient._id.toString(), "emergency:cancelled", {
+        emergencyId: emergency._id,
+        reason: emergency.cancellationReason,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    if (emergency.assignedDriver) {
+      emitToUser(emergency.assignedDriver._id.toString(), "emergency:cancelled", {
+        emergencyId: emergency._id,
+        reason: emergency.cancellationReason,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  } catch (error) {
+    console.error("⚠️ Failed to send notifications:", error.message);
+  }
+
+  console.log(`✅ [FORCE CANCEL] Emergency ${emergencyId} cancelled successfully`);
+
+  sendResponse(
+    res,
+    RESPONSE_CODES.SUCCESS,
+    "Emergency cancelled successfully",
+    { emergency }
+  );
+});
+

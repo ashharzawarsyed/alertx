@@ -12,6 +12,9 @@ import {
   markArrivedAtHospital,
   cancelEmergency,
   rejectEmergency,
+  getDriverActiveEmergency,
+  forceCompleteEmergency,
+  forceCancelEmergency,
 } from "../controllers/emergencyController.js";
 import {
   validateEmergencyRequest,
@@ -155,6 +158,44 @@ router.post(
   authorize(USER_ROLES.DRIVER),
   validateObjectId("id"),
   rejectEmergency
+);
+
+/**
+ * @route   GET /api/v1/emergencies/driver/active
+ * @desc    Get driver's active emergency
+ * @access  Private (Driver)
+ */
+router.get(
+  "/driver/active",
+  authenticate,
+  authorize(USER_ROLES.DRIVER),
+  getDriverActiveEmergency
+);
+
+/**
+ * @route   PUT /api/v1/emergencies/:id/force-complete
+ * @desc    Force complete emergency (for stuck emergencies)
+ * @access  Private (Driver or Patient)
+ */
+router.put(
+  "/:id/force-complete",
+  authenticate,
+  authorize(USER_ROLES.DRIVER, USER_ROLES.PATIENT),
+  validateObjectId("id"),
+  forceCompleteEmergency
+);
+
+/**
+ * @route   PUT /api/v1/emergencies/:id/force-cancel
+ * @desc    Force cancel emergency for in-progress emergencies
+ * @access  Private (Driver or Patient)
+ */
+router.put(
+  "/:id/force-cancel",
+  authenticate,
+  authorize(USER_ROLES.DRIVER, USER_ROLES.PATIENT),
+  validateObjectId("id"),
+  forceCancelEmergency
 );
 
 export default router;

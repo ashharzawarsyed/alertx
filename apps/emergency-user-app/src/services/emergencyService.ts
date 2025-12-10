@@ -586,6 +586,38 @@ class EmergencyService {
       };
     }
   }
+
+  /**
+   * Force cancel emergency (for in-progress emergencies that are stuck)
+   */
+  async forceCancelEmergency(
+    emergencyId: string,
+    reason?: string
+  ): Promise<EmergencyResponse> {
+    try {
+      console.log('⚠️ Force cancelling emergency:', emergencyId);
+
+      const response = await this.api.put<EmergencyResponse>(
+        `/emergencies/${emergencyId}/force-cancel`,
+        { reason: reason || 'Emergency cancelled by patient due to technical issue' }
+      );
+
+      console.log('✅ Emergency force cancelled');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Force cancel error:', error);
+
+      if (error.response?.data) {
+        return error.response.data;
+      }
+
+      return {
+        success: false,
+        message: error.message || 'Failed to force cancel emergency',
+        errors: [error.message || 'Network error'],
+      };
+    }
+  }
 }
 
 export const emergencyService = new EmergencyService();

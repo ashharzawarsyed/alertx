@@ -458,23 +458,27 @@ export const getHospitalAmbulancesTracking = asyncHandler(async (req, res) => {
   // Get emergencies assigned to this hospital (incoming ambulances)
   const incomingEmergencies = await Emergency.find({
     assignedHospital: hospitalId,
-    status: { $in: ["dispatched", "on_route", "arrived"] },
+    status: { $in: ["accepted", "in_progress"] }, // Match EMERGENCY_STATUS constants
   })
-    .populate({
-      path: "assignedAmbulance",
-      select: "vehicleNumber status currentLocation crew",
-    })
-    .select("assignedAmbulance patient location estimatedArrival")
+    .populate("assignedDriver", "name phone driverInfo")
+    .populate("patient", "name phone")
+    .select("assignedDriver patient location estimatedArrival status ambulanceLocation")
     .lean();
 
   const incomingAmbulances = incomingEmergencies
-    .filter((em) => em.assignedAmbulance)
+    .filter((em) => em.assignedDriver)
     .map((em) => ({
-      ...em.assignedAmbulance,
+      driverName: em.assignedDriver?.name,
+      driverPhone: em.assignedDriver?.phone,
+      ambulanceNumber: em.assignedDriver?.driverInfo?.ambulanceNumber,
+      currentLocation: em.ambulanceLocation || em.location,
       emergency: {
+        id: em._id,
         patientName: em.patient?.name,
+        patientPhone: em.patient?.phone,
         location: em.location,
         eta: em.estimatedArrival,
+        status: em.status,
       },
     }));
 

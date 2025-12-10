@@ -309,6 +309,91 @@ export default function ActiveEmergencyScreen() {
     }
   };
 
+  const handleForceCancel = () => {
+    Alert.alert(
+      'Cancel Emergency',
+      'Are you sure you want to cancel this emergency? This should only be used if there is a technical issue or the emergency cannot be completed.',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
+            if (!activeEmergency) return;
+
+            try {
+              const result = await emergencyService.forceCancelEmergency(
+                activeEmergency._id,
+                'Emergency cancelled by driver due to technical issue'
+              );
+
+              if (result.success) {
+                addToHistory(activeEmergency);
+                clearActiveEmergency();
+                
+                // Stop simulation if running
+                if (isSimulating) {
+                  stopRouteSimulation();
+                  setIsSimulating(false);
+                }
+
+                Alert.alert('Emergency Cancelled', 'The emergency has been cancelled.', [
+                  { text: 'OK', onPress: () => router.replace('/(tabs)') },
+                ]);
+              } else {
+                Alert.alert('Error', result.message || 'Failed to cancel emergency');
+              }
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to cancel emergency');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleForceComplete = () => {
+    Alert.alert(
+      'Force Complete Emergency',
+      'Mark this emergency as completed? Use this if there was a technical issue preventing normal completion.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Complete',
+          onPress: async () => {
+            if (!activeEmergency) return;
+
+            try {
+              const result = await emergencyService.forceCompleteEmergency(
+                activeEmergency._id,
+                'Emergency force completed due to technical issue'
+              );
+
+              if (result.success) {
+                addToHistory(activeEmergency);
+                clearActiveEmergency();
+                
+                // Stop simulation if running
+                if (isSimulating) {
+                  stopRouteSimulation();
+                  setIsSimulating(false);
+                }
+
+                Alert.alert('Emergency Completed', 'The emergency has been marked as completed.', [
+                  { text: 'OK', onPress: () => router.replace('/(tabs)') },
+                ]);
+              } else {
+                Alert.alert('Error', result.message || 'Failed to complete emergency');
+              }
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to complete emergency');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleToggleSimulation = () => {
     if (isSimulating) {
       // Stop simulation
@@ -612,6 +697,32 @@ export default function ActiveEmergencyScreen() {
             <Text style={styles.buttonText}>Complete Trip</Text>
           </TouchableOpacity>
         )}
+
+        {/* Emergency Actions */}
+        <View style={styles.emergencyActions}>
+          <Text style={styles.emergencyActionsTitle}>Emergency Actions</Text>
+          <Text style={styles.emergencyActionsSubtitle}>
+            Use these only if there's a technical issue
+          </Text>
+          
+          <View style={styles.emergencyButtonRow}>
+            <TouchableOpacity
+              style={styles.forceCompleteButton}
+              onPress={handleForceComplete}
+            >
+              <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
+              <Text style={styles.emergencyButtonText}>Force Complete</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.forceCancelButton}
+              onPress={handleForceCancel}
+            >
+              <Ionicons name="close-circle-outline" size={20} color="#fff" />
+              <Text style={styles.emergencyButtonText}>Cancel Emergency</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     </View>
   );
@@ -812,5 +923,53 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  emergencyActions: {
+    marginTop: 24,
+    paddingTop: 20,
+    borderTopWidth: 2,
+    borderTopColor: '#f3f4f6',
+  },
+  emergencyActionsTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#6b7280',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  emergencyActionsSubtitle: {
+    fontSize: 12,
+    color: '#9ca3af',
+    marginBottom: 12,
+  },
+  emergencyButtonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  forceCompleteButton: {
+    flex: 1,
+    backgroundColor: '#f59e0b',
+    paddingVertical: 12,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  forceCancelButton: {
+    flex: 1,
+    backgroundColor: '#6b7280',
+    paddingVertical: 12,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  emergencyButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

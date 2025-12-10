@@ -417,9 +417,17 @@ export default function EmergencyTrackingScreen() {
   };
 
   const handleCancelEmergency = () => {
+    // Check if emergency is in progress (use force cancel)
+    const isInProgress = emergency?.status === 'accepted' || emergency?.status === 'in_progress';
+    
+    const title = isInProgress ? "Cancel In-Progress Emergency" : "Cancel Emergency";
+    const message = isInProgress 
+      ? "This emergency is already in progress. Are you sure you want to cancel? This should only be used if there's a technical issue."
+      : "Are you sure you want to cancel this emergency request?";
+
     Alert.alert(
-      "Cancel Emergency",
-      "Are you sure you want to cancel this emergency request?",
+      title,
+      message,
       [
         { text: "No", style: "cancel" },
         {
@@ -427,10 +435,15 @@ export default function EmergencyTrackingScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              const response = await emergencyService.cancelEmergency(
-                emergencyId,
-                "Cancelled by user"
-              );
+              const response = isInProgress
+                ? await emergencyService.forceCancelEmergency(
+                    emergencyId,
+                    "Cancelled by patient due to technical issue"
+                  )
+                : await emergencyService.cancelEmergency(
+                    emergencyId,
+                    "Cancelled by user"
+                  );
 
               if (response.success) {
                 Alert.alert("Emergency Cancelled", "Your emergency request has been cancelled.", [
@@ -791,15 +804,24 @@ export default function EmergencyTrackingScreen() {
             </View>
           </View>
 
-          {/* Cancel Button */}
-          {["pending", "accepted"].includes(emergency.status) && (
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleCancelEmergency}
-            >
-              <Ionicons name="close-circle" size={20} color="#FFFFFF" />
-              <Text style={styles.cancelButtonText}>Cancel Emergency</Text>
-            </TouchableOpacity>
+          {/* Cancel Button - Available for pending, accepted, and in_progress */}
+          {["pending", "accepted", "in_progress"].includes(emergency.status) && (
+            <View style={styles.cancelSection}>
+              {emergency.status === 'in_progress' && (
+                <Text style={styles.cancelWarning}>
+                  ⚠️ Emergency is in progress. Use cancel only if there's a technical issue.
+                </Text>
+              )}
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={handleCancelEmergency}
+              >
+                <Ionicons name="close-circle" size={20} color="#FFFFFF" />
+                <Text style={styles.cancelButtonText}>
+                  {emergency.status === 'in_progress' ? 'Force Cancel Emergency' : 'Cancel Emergency'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           )}
 
           <View style={{ height: 20 }} />
@@ -1138,6 +1160,21 @@ const styles = StyleSheet.create({
   },
 
   // Cancel Button
+  cancelSection: {
+    padding: 16,
+    backgroundColor: "#FEF2F2",
+    borderTopWidth: 1,
+    borderTopColor: "#FEE2E2",
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
+  },
+  cancelWarning: {
+    fontSize: 13,
+    color: "#DC2626",
+    marginBottom: 12,
+    fontWeight: "500",
+  },
   cancelButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -1146,7 +1183,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#DC2626",
     paddingVertical: 14,
     borderRadius: 12,
-    marginTop: 8,
   },
   cancelButtonText: {
     fontSize: 16,

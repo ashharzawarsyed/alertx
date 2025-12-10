@@ -17,7 +17,8 @@ const app = express();
 /* -------------------------------
    1. Database Connection
 --------------------------------- */
-connectDB();
+// NOTE: MongoDB connection is now handled in server.js before starting Express
+// This ensures the database is ready before handling requests
 
 /* -------------------------------
    2. Global Middleware
