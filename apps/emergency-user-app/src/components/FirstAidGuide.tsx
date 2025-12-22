@@ -512,8 +512,7 @@ export const FirstAidGuide: React.FC<FirstAidGuideProps> = ({
       <FirstAidChatbot
         visible={showChatbot}
         onClose={() => setShowChatbot(false)}
-        emergencyType={emergencyType}
-        severity={severity}
+        symptoms={[emergencyType]}
       />
     </Modal>
   );

@@ -85,6 +85,12 @@ const emergencySchema = new mongoose.Schema(
       ref: "Hospital",
     },
 
+    // Reserved bed information
+    reservedBedType: {
+      type: String,
+      enum: ['general', 'icu', 'emergency', 'operation'],
+    },
+
     // Ambulance real-time location tracking
     ambulanceLocation: {
       lat: {

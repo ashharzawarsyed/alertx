@@ -126,38 +126,197 @@ const DashboardHome = () => {
 
   // Setup Socket.IO for real-time updates
   useEffect(() => {
-    if (!hospitalId || !token) return;
+    if (!hospitalId || !token) {
+      console.warn("⚠️ [DASHBOARD] Missing hospitalId or token:", { hospitalId: !!hospitalId, token: !!token });
+      return;
+    }
 
+    console.log("🏥 [DASHBOARD] Setting up Socket.IO connection");
+    console.log("🏥 [DASHBOARD] Hospital ID:", hospitalId);
+    
     // Connect to Socket.IO
     socketService.connect(hospitalId, token);
     socketService.joinHospitalRoom(hospitalId);
+    
+    console.log("✅ [DASHBOARD] Socket connection initiated");
 
     // Listen for bed updates
+    console.log("📡 [DASHBOARD] Registering bed update listener");
     socketService.onBedUpdate((data) => {
-      console.log("Bed updated:", data);
+      console.log("🛏️ [DASHBOARD] Bed updated event received:", data);
       setHospitalData((prev) => ({
         ...prev,
         availableBeds: data.availableBeds,
         lastBedUpdate: data.lastBedUpdate,
       }));
+
+      // Show toast notification
+      if (data.action === 'occupied') {
+        toast.success(`${data.bedType.toUpperCase()} bed automatically reserved for incoming emergency`, {
+          duration: 4000,
+          icon: '🛏️',
+        });
+      }
+    });
+
+    // Listen for incoming emergencies
+    console.log("📡 [DASHBOARD] Registering emergency incoming listener");
+    socketService.onEmergencyIncoming((data) => {
+      console.log("🚨 [DASHBOARD] Incoming emergency event received:", data);
+      
+      // Add to emergency queue
+      setIncomingPatients((prev) => [{
+        id: data.emergency.id,
+        patientName: data.emergency.patient.name || 'Emergency Patient',
+        severity: data.emergency.severity,
+        symptoms: data.emergency.symptoms,
+        eta: data.emergency.estimatedArrival,
+        driverName: data.driver.name,
+        ambulanceNumber: data.driver.ambulanceNumber,
+        reservedBedType: data.reservedBedType,
+        timestamp: data.timestamp,
+      }, ...prev]);
+
+      // Add to critical alerts if high severity
+      if (data.emergency.severity === 'critical' || data.emergency.severity === 'high') {
+        setCriticalAlerts((prev) => [{
+          id: data.emergency.id,
+          type: 'incoming_emergency',
+          severity: data.emergency.severity,
+          message: `Critical patient incoming - ETA: ${data.emergency.estimatedArrival}`,
+          patientName: data.emergency.patient.name,
+          timestamp: data.timestamp,
+        }, ...prev.slice(0, 4)]); // Keep only last 5 alerts
+      }
+
+      // Show toast notification
+      toast((t) => (
+        <div className="flex items-center gap-3">
+          <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+            <Bell className="w-5 h-5 text-red-600" weight="fill" />
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold text-gray-900">
+              {data.emergency.severity === 'critical' ? '🚨 Critical Emergency' : '⚠️ Emergency Incoming'}
+            </p>
+            <p className="text-sm text-gray-600">
+              {data.emergency.patient.name} - ETA: {data.emergency.estimatedArrival}
+            </p>
+          </div>
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="flex-shrink-0 text-gray-400 hover:text-gray-600"
+          >
+            <X weight="bold" />
+          </button>
+        </div>
+      ), {
+        duration: 6000,
+        style: {
+          padding: '12px',
+        },
+      });
+    });
+
+    // Listen for emergency updates
+    socketService.onEmergencyUpdate((data) => {
+      console.log("📋 Emergency updated:", data);
+      
+      // Update emergency in the list
+      setIncomingPatients((prev) => 
+        prev.map((p) => p.id === data.emergencyId ? { ...p, ...data.updates } : p)
+      );
+    });
+
+    // Listen for emergency completed
+    socketService.onEmergencyCompleted((data) => {
+      console.log("✅ Emergency completed:", data);
+      
+      // Remove from incoming patients
+      setIncomingPatients((prev) => prev.filter((p) => p.id !== data.emergencyId));
+      
+      // Add to patients list if admitted
+      if (data.patient) {
+        setPatients((prev) => [data.patient, ...prev]);
+        
+        toast.success(`Patient ${data.patient.name} admitted successfully`, {
+          icon: '✅',
+        });
+      }
+
+      // Update stats
+      setStats((prev) => prev ? {
+        ...prev,
+        totalServed: (prev.totalServed || 0) + 1,
+      } : null);
     });
 
     // Listen for patient admitted
     socketService.onPatientAdmitted((data) => {
-      console.log("Patient admitted:", data);
+      console.log("👤 Patient admitted:", data);
       setPatients((prev) => [data.patient, ...prev]);
+      
+      toast.success(`Patient ${data.patient.name} admitted`, {
+        icon: '👤',
+      });
     });
 
     // Listen for patient discharged
     socketService.onPatientDischarged((data) => {
-      console.log("Patient discharged:", data);
+      console.log("🚪 Patient discharged:", data);
       setPatients((prev) => prev.filter((p) => p._id !== data.patientId));
+      
+      toast.info(`Patient discharged`, {
+        icon: '🚪',
+      });
     });
 
     return () => {
       socketService.removeAllListeners();
     };
   }, [hospitalId, token]);
+
+  // Periodic stats refresh
+  useEffect(() => {
+    if (!hospitalId) return;
+
+    const refreshStats = async () => {
+      try {
+        const statsResponse = await hospitalService.getHospitalStats(hospitalId);
+        if (statsResponse?.success) {
+          setStats(statsResponse.data);
+        }
+      } catch (error) {
+        console.error('Failed to refresh stats:', error);
+      }
+    };
+
+    // Refresh stats every 30 seconds
+    const statsInterval = setInterval(refreshStats, 30000);
+
+    return () => clearInterval(statsInterval);
+  }, [hospitalId]);
+
+  // Refresh recent activity
+  useEffect(() => {
+    if (!hospitalId) return;
+
+    const refreshPatients = async () => {
+      try {
+        const patientsResponse = await patientService.getHospitalPatients(hospitalId);
+        if (patientsResponse?.success) {
+          setPatients(patientsResponse.data.patients || []);
+        }
+      } catch (error) {
+        console.error('Failed to refresh patients:', error);
+      }
+    };
+
+    // Refresh patients every minute
+    const patientsInterval = setInterval(refreshPatients, 60000);
+
+    return () => clearInterval(patientsInterval);
+  }, [hospitalId]);
 
   const getBedUtilization = (bedType) => {
     if (!hospitalData) return 0;
@@ -274,7 +433,6 @@ const DashboardHome = () => {
           <div className="relative w-20 h-20 mx-auto mb-6">
             <div className="absolute inset-0 border-4 border-blue-500/30 rounded-full"></div>
             <div className="absolute inset-0 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
-          </div>
           </div>
           <p className="text-gray-300 text-lg font-medium">
             Loading dashboard...

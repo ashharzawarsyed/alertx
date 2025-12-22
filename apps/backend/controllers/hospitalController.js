@@ -91,46 +91,31 @@ export const getAllHospitals = asyncHandler(async (req, res) => {
     ];
   }
 
-  let hospitals;
-
-  // If location provided, search by proximity
-  if (lat && lng) {
-    hospitals = await Hospital.find({
-      ...query,
-      location: {
-        $near: {
-          $geometry: {
-            type: "Point",
-            coordinates: [parseFloat(lng), parseFloat(lat)],
-          },
-          $maxDistance: radius * 1000, // Convert km to meters
-        },
-      },
-    })
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit));
-  } else {
-    hospitals = await Hospital.find(query)
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit));
-  }
+  // Get all hospitals matching the query first
+  let hospitals = await Hospital.find(query)
+    .skip((page - 1) * limit)
+    .limit(parseInt(limit) * 10); // Get more to filter by distance
 
   const total = await Hospital.countDocuments(query);
 
-  // Add distance if location provided
+  // Add distance and filter by radius if location provided
   if (lat && lng) {
-    hospitals = hospitals.map((hospital) => {
-      const distance = calculateDistance(
-        parseFloat(lat),
-        parseFloat(lng),
-        hospital.location.lat,
-        hospital.location.lng
-      );
-      return {
-        ...hospital.toObject(),
-        distance: Math.round(distance * 10) / 10, // Round to 1 decimal
-      };
-    });
+    hospitals = hospitals
+      .map((hospital) => {
+        const distance = calculateDistance(
+          parseFloat(lat),
+          parseFloat(lng),
+          hospital.location.lat,
+          hospital.location.lng
+        );
+        return {
+          ...hospital.toObject(),
+          distance: Math.round(distance * 10) / 10, // Round to 1 decimal
+        };
+      })
+      .filter((hospital) => hospital.distance <= radius) // Filter by radius
+      .sort((a, b) => a.distance - b.distance) // Sort by distance
+      .slice(0, parseInt(limit)); // Limit results
   }
 
   sendResponse(
@@ -444,5 +429,70 @@ export const getHospitalStats = asyncHandler(async (req, res) => {
     RESPONSE_CODES.SUCCESS,
     "Hospital statistics retrieved successfully",
     stats
+  );
+});
+
+/**
+ * @desc    Get ambulances tracking for hospital
+ * @route   GET /api/v1/hospitals/:id/ambulances/tracking
+ * @access  Private (Hospital)
+ */
+export const getHospitalAmbulancesTracking = asyncHandler(async (req, res) => {
+  const { id: hospitalId } = req.params;
+
+  console.log(`🚑 [TRACKING] Fetching ambulances for hospital: ${hospitalId}`);
+
+  // Import Ambulance model
+  const Ambulance = (await import("../models/Ambulance.js")).default;
+
+  // Get ambulances owned by this hospital
+  const ownAmbulances = await Ambulance.find({
+    hospitalId,
+    status: { $in: ["available", "on_route", "busy"] },
+  })
+    .select("vehicleNumber status currentLocation crew lastUpdate")
+    .lean();
+
+  console.log(`✅ [TRACKING] Found ${ownAmbulances.length} own ambulances`);
+
+  // Get emergencies assigned to this hospital (incoming ambulances)
+  const incomingEmergencies = await Emergency.find({
+    assignedHospital: hospitalId,
+    status: { $in: ["accepted", "in_progress"] }, // Match EMERGENCY_STATUS constants
+  })
+    .populate("assignedDriver", "name phone driverInfo")
+    .populate("patient", "name phone")
+    .select("assignedDriver patient location estimatedArrival status ambulanceLocation")
+    .lean();
+
+  const incomingAmbulances = incomingEmergencies
+    .filter((em) => em.assignedDriver)
+    .map((em) => ({
+      driverName: em.assignedDriver?.name,
+      driverPhone: em.assignedDriver?.phone,
+      ambulanceNumber: em.assignedDriver?.driverInfo?.ambulanceNumber,
+      currentLocation: em.ambulanceLocation || em.location,
+      emergency: {
+        id: em._id,
+        patientName: em.patient?.name,
+        patientPhone: em.patient?.phone,
+        location: em.location,
+        eta: em.estimatedArrival,
+        status: em.status,
+      },
+    }));
+
+  console.log(`✅ [TRACKING] Found ${incomingAmbulances.length} incoming ambulances`);
+
+  sendResponse(
+    res,
+    RESPONSE_CODES.SUCCESS,
+    "Ambulance tracking data retrieved successfully",
+    {
+      ownAmbulances,
+      incomingAmbulances,
+      total: ownAmbulances.length + incomingAmbulances.length,
+      timestamp: new Date().toISOString(),
+    }
   );
 });

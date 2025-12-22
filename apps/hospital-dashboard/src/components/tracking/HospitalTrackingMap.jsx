@@ -1,8 +1,9 @@
 import { MapPin, Truck, FirstAid } from 'phosphor-react';
 import React, { useEffect, useRef, useState } from 'react';
 
-import { useAmbulanceTracking } from '../utils/ambulanceTracking';
-import { generateTrackingMapHTML } from '../utils/mapPolyline';
+import { useAmbulanceTracking } from '../../utils/ambulanceTracking';
+import { generateTrackingMapHTML } from '../../utils/mapPolyline';
+import { getCurrentLocation, POF_HOSPITAL_COORDS } from '../../utils/locationService';
 
 /**
  * Hospital Tracking Map Component
@@ -25,6 +26,27 @@ export const HospitalTrackingMap = ({
 }) => {
   const iframeRef = useRef(null);
   const [mapError, setMapError] = useState(false);
+  const [hospitalLocation, setHospitalLocation] = useState(POF_HOSPITAL_COORDS);
+
+  // Get hospital location on mount
+  useEffect(() => {
+    const loadHospitalLocation = async () => {
+      // Try to get location from hospital data first
+      if (hospital?.location) {
+        const location = {
+          lat: hospital.location.latitude || hospital.location.lat,
+          lng: hospital.location.longitude || hospital.location.lng,
+        };
+        setHospitalLocation(location);
+      } else {
+        // Get current location or fallback to POF Hospital
+        const location = await getCurrentLocation();
+        setHospitalLocation(location);
+      }
+    };
+
+    loadHospitalLocation();
+  }, [hospital]);
 
   // Extract locations
   const ambulanceLocation = ambulance?.location 
@@ -36,10 +58,6 @@ export const HospitalTrackingMap = ({
     : patient?.pickupLocation
     ? { lat: patient.pickupLocation.latitude || patient.pickupLocation.lat, lng: patient.pickupLocation.longitude || patient.pickupLocation.lng }
     : null;
-  
-  const hospitalLocation = hospital?.location 
-    ? { lat: hospital.location.latitude || hospital.location.lat, lng: hospital.location.longitude || hospital.location.lng }
-    : { lat: 33.7077, lng: 73.0533 }; // PIMS Hospital fallback
 
   // Use tracking hook
   const tracking = useAmbulanceTracking(

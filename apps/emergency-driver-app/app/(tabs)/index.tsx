@@ -45,6 +45,7 @@ export default function HomeScreen() {
     setupSocketListeners();
     requestLocationPermission();
     fetchDriverLocation();
+    recoverActiveEmergency(); // NEW: Check for stuck emergencies
 
     // Start basic location tracking (updates map only, no socket emission)
     const locationInterval = startBasicLocationTracking();
@@ -56,6 +57,52 @@ export default function HomeScreen() {
       if (locationIntervalRef.current) clearInterval(locationIntervalRef.current);
     };
   }, []);
+
+  /**
+   * Recover active emergency after app restart/crash
+   */
+  const recoverActiveEmergency = async () => {
+    try {
+      console.log('🔄 [RECOVERY] Checking for active emergency...');
+      const activeEmergency = await emergencyService.getActiveEmergency();
+      
+      if (activeEmergency) {
+        console.log('✅ [RECOVERY] Found active emergency:', activeEmergency._id);
+        
+        Alert.alert(
+          'Active Emergency Found',
+          `You have an ongoing emergency for ${activeEmergency.patient.name}. Do you want to continue?`,
+          [
+            {
+              text: 'Cancel Emergency',
+              style: 'destructive',
+              onPress: async () => {
+                const result = await emergencyService.forceCancelEmergency(
+                  activeEmergency._id,
+                  'Driver cancelled after app restart'
+                );
+                if (result.success) {
+                  Alert.alert('Success', 'Emergency cancelled successfully');
+                }
+              },
+            },
+            {
+              text: 'Continue',
+              onPress: () => {
+                setActiveEmergency(activeEmergency);
+                router.push('/active-emergency');
+              },
+            },
+          ],
+          { cancelable: false }
+        );
+      } else {
+        console.log('✅ [RECOVERY] No active emergency found');
+      }
+    } catch (error) {
+      console.error('❌ [RECOVERY] Error checking for active emergency:', error);
+    }
+  };
 
   const fetchDriverLocation = async () => {
     try {

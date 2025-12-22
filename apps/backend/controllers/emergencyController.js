@@ -481,11 +481,53 @@ export const acceptEmergency = asyncHandler(async (req, res) => {
     );
   }
 
-  console.log(`✅ Hospital assigned: ${nearestHospital.name}`);
+  console.log(`✅ [EMERGENCY] Hospital assigned: ${nearestHospital.name} (ID: ${nearestHospital._id})`);
+
+  // Automatically occupy a bed for incoming emergency
+  const bedType = emergency.severityLevel === SEVERITY_LEVELS.CRITICAL ? 'icu' : 'emergency';
+  console.log(`🛏️ [BED] Attempting to occupy ${bedType} bed at ${nearestHospital.name}`);
+  console.log(`🛏️ [BED] Available before: ${nearestHospital.availableBeds[bedType]}`);
+  
+  if (nearestHospital.availableBeds[bedType] > 0) {
+    nearestHospital.availableBeds[bedType] -= 1;
+    nearestHospital.lastBedUpdate = new Date();
+    await nearestHospital.save();
+    console.log(`✅ [BED] Auto-occupied ${bedType} bed for emergency ${emergency._id}`);
+    console.log(`🛏️ [BED] Available after: ${nearestHospital.availableBeds[bedType]}`);
+
+    // Emit bed update via socket
+    const io = req.app.get('io');
+    console.log(`📡 [SOCKET] IO instance exists:`, !!io);
+    
+    if (io) {
+      const roomName = `hospital:${nearestHospital._id}`;
+      console.log(`📡 [SOCKET] Emitting bed:updated to room: ${roomName}`);
+      
+      const bedUpdateData = {
+        hospitalId: nearestHospital._id,
+        availableBeds: nearestHospital.availableBeds,
+        bedType,
+        action: 'occupied',
+        emergencyId: emergency._id,
+        lastBedUpdate: nearestHospital.lastBedUpdate,
+      };
+      
+      console.log(`📡 [SOCKET] Bed update data:`, JSON.stringify(bedUpdateData, null, 2));
+      
+      io.to(roomName).emit('bed:updated', bedUpdateData);
+      
+      console.log(`✅ [SOCKET] bed:updated event emitted to ${roomName}`);
+    } else {
+      console.error(`❌ [SOCKET] IO instance not found on req.app`);
+    }
+  } else {
+    console.warn(`⚠️ [BED] No ${bedType} beds available at ${nearestHospital.name}`);
+  }
 
   // Accept emergency
   emergency.assignedDriver = req.user.id;
   emergency.assignedHospital = nearestHospital._id;
+  emergency.reservedBedType = bedType; // Store which bed type was reserved
   await emergency.updateStatus(EMERGENCY_STATUS.ACCEPTED);
 
   // Update driver status
@@ -536,8 +578,51 @@ export const acceptEmergency = asyncHandler(async (req, res) => {
     timestamp: new Date(),
   });
 
-  console.log(`✅ Emergency ${emergency._id} accepted by driver ${driver.name}`);
-  console.log(`📡 Socket notification sent to patient ${emergency.patient._id}`);
+  // Notify hospital about incoming emergency
+  const io = req.app.get('io');
+  console.log(`📡 [HOSPITAL NOTIFY] Preparing to notify hospital ${nearestHospital._id}`);
+  
+  if (io) {
+    const roomName = `hospital:${nearestHospital._id}`;
+    const emergencyData = {
+      emergency: {
+        id: emergency._id,
+        patient: emergency.patient,
+        symptoms: emergency.symptoms,
+        severity: emergency.severityLevel,
+        triageScore: emergency.triageScore,
+        location: emergency.location,
+        estimatedArrival: '15-20 minutes',
+      },
+      driver: {
+        name: driver.name,
+        phone: driver.phone,
+        ambulanceNumber: driver.driverInfo.ambulanceNumber,
+      },
+      reservedBedType: bedType,
+      timestamp: new Date(),
+    };
+    
+    console.log(`📡 [HOSPITAL NOTIFY] Emitting emergency:incoming to room: ${roomName}`);
+    console.log(`📡 [HOSPITAL NOTIFY] Data:`, JSON.stringify(emergencyData, null, 2));
+    
+    io.to(roomName).emit('emergency:incoming', emergencyData);
+    
+    console.log(`✅ [HOSPITAL NOTIFY] emergency:incoming emitted to ${roomName}`);
+    
+    // Also check how many clients are in this room
+    const clientsInRoom = await io.in(roomName).allSockets();
+    console.log(`👥 [HOSPITAL NOTIFY] Clients in room ${roomName}:`, clientsInRoom.size);
+    if (clientsInRoom.size === 0) {
+      console.warn(`⚠️ [HOSPITAL NOTIFY] No clients connected to room ${roomName}!`);
+    }
+  } else {
+    console.error(`❌ [HOSPITAL NOTIFY] IO instance not found!`);
+  }
+
+  console.log(`✅ [EMERGENCY] Emergency ${emergency._id} accepted by driver ${driver.name}`);
+  console.log(`📡 [PATIENT] Socket notification sent to patient ${emergency.patient._id}`);
+  console.log(`🏥 [HOSPITAL] Hospital ${nearestHospital.name} notified of incoming emergency`);
 
   sendResponse(res, RESPONSE_CODES.SUCCESS, "Emergency accepted successfully", {
     emergency,
@@ -573,7 +658,7 @@ export const updateEmergencyStatus = asyncHandler(async (req, res) => {
 
   await emergency.updateStatus(status, req.user.id);
 
-  // Update driver status if emergency is completed or cancelled
+  // Update driver status and release bed if emergency is completed or cancelled
   if (
     status === EMERGENCY_STATUS.COMPLETED ||
     status === EMERGENCY_STATUS.CANCELLED
@@ -582,6 +667,39 @@ export const updateEmergencyStatus = asyncHandler(async (req, res) => {
       await User.findByIdAndUpdate(emergency.assignedDriver, {
         "driverInfo.status": DRIVER_STATUS.AVAILABLE,
       });
+    }
+
+    // Release reserved bed if it was occupied
+    if (emergency.assignedHospital && emergency.reservedBedType) {
+      const hospital = await Hospital.findById(emergency.assignedHospital);
+      if (hospital) {
+        const bedType = emergency.reservedBedType;
+        
+        // Only release if not manually managed (can add a flag for this later)
+        if (status === EMERGENCY_STATUS.CANCELLED) {
+          // Auto-release on cancellation
+          hospital.availableBeds[bedType] = (hospital.availableBeds[bedType] || 0) + 1;
+          hospital.lastBedUpdate = new Date();
+          await hospital.save();
+          
+          console.log(`🛏️ Auto-released ${bedType} bed for cancelled emergency ${emergency._id}`);
+          
+          // Emit bed update via socket
+          const io = req.app.get('io');
+          if (io) {
+            io.to(`hospital:${hospital._id}`).emit('bed:updated', {
+              hospitalId: hospital._id,
+              availableBeds: hospital.availableBeds,
+              bedType,
+              action: 'released',
+              reason: 'emergency_cancelled',
+              emergencyId: emergency._id,
+              lastBedUpdate: hospital.lastBedUpdate,
+            });
+          }
+        }
+        // For completed emergencies, staff will manually manage bed after patient discharge
+      }
     }
   }
 
@@ -1303,5 +1421,221 @@ export const rejectEmergency = asyncHandler(async (req, res) => {
       }
     );
   }
+});
+
+/**
+ * @desc    Get driver's active emergency
+ * @route   GET /api/v1/emergencies/driver/active
+ * @access  Private (Driver)
+ */
+export const getDriverActiveEmergency = asyncHandler(async (req, res) => {
+  const driverId = req.user.id;
+
+  console.log(`🔍 [DRIVER ACTIVE] Fetching active emergency for driver: ${driverId}`);
+
+  // Find active emergency assigned to this driver
+  const activeEmergency = await Emergency.findOne({
+    assignedDriver: driverId,
+    status: { $in: [EMERGENCY_STATUS.ACCEPTED, EMERGENCY_STATUS.IN_PROGRESS] },
+  })
+    .populate('patient', 'name phone medicalProfile')
+    .populate('assignedAmbulance', 'vehicleNumber type')
+    .populate('assignedHospital', 'name address location beds')
+    .populate('assignedDriver', 'name phone')
+    .sort({ createdAt: -1 });
+
+  if (!activeEmergency) {
+    console.log('✅ [DRIVER ACTIVE] No active emergency found');
+    return sendResponse(
+      res,
+      RESPONSE_CODES.SUCCESS,
+      "No active emergency",
+      { activeEmergency: null }
+    );
+  }
+
+  console.log(`✅ [DRIVER ACTIVE] Found active emergency: ${activeEmergency._id}`);
+
+  sendResponse(
+    res,
+    RESPONSE_CODES.SUCCESS,
+    "Active emergency retrieved",
+    { activeEmergency }
+  );
+});
+
+/**
+ * @desc    Force complete emergency (emergency button for stuck emergencies)
+ * @route   PUT /api/v1/emergencies/:id/force-complete
+ * @access  Private (Driver or Patient)
+ */
+export const forceCompleteEmergency = asyncHandler(async (req, res) => {
+  const { id: emergencyId } = req.params;
+  const { reason } = req.body;
+
+  console.log(`🚨 [FORCE COMPLETE] Emergency ${emergencyId} by user ${req.user.id}`);
+
+  const emergency = await Emergency.findById(emergencyId)
+    .populate('patient')
+    .populate('assignedDriver')
+    .populate('assignedHospital');
+
+  if (!emergency) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.NOT_FOUND,
+      "Emergency not found"
+    );
+  }
+
+  // Verify user is involved in this emergency
+  const isPatient = emergency.patient._id.toString() === req.user.id;
+  const isDriver = emergency.assignedDriver?._id.toString() === req.user.id;
+
+  if (!isPatient && !isDriver) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.FORBIDDEN,
+      "You are not authorized to complete this emergency"
+    );
+  }
+
+  // Only allow for accepted or in_progress emergencies
+  if (![EMERGENCY_STATUS.ACCEPTED, EMERGENCY_STATUS.IN_PROGRESS].includes(emergency.status)) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.BAD_REQUEST,
+      `Cannot force complete emergency with status: ${emergency.status}`
+    );
+  }
+
+  console.log(`✅ [FORCE COMPLETE] Marking emergency as completed`);
+
+  // Update emergency status
+  emergency.status = EMERGENCY_STATUS.COMPLETED;
+  emergency.completedAt = new Date();
+  emergency.forceCompleted = true;
+  emergency.forceCompleteReason = reason || 'Emergency force completed due to app crash or technical issue';
+  emergency.forceCompletedBy = req.user.id;
+  
+  await emergency.save();
+
+  // Notify both patient and driver
+  try {
+    if (emergency.patient) {
+      emitToUser(emergency.patient._id.toString(), "emergency:completed", {
+        emergencyId: emergency._id,
+        message: 'Emergency has been marked as completed',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    if (emergency.assignedDriver) {
+      emitToUser(emergency.assignedDriver._id.toString(), "emergency:completed", {
+        emergencyId: emergency._id,
+        message: 'Emergency has been marked as completed',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  } catch (error) {
+    console.error("⚠️ Failed to send notifications:", error.message);
+  }
+
+  console.log(`✅ [FORCE COMPLETE] Emergency ${emergencyId} completed successfully`);
+
+  sendResponse(
+    res,
+    RESPONSE_CODES.SUCCESS,
+    "Emergency completed successfully",
+    { emergency }
+  );
+});
+
+/**
+ * @desc    Force cancel emergency for in-progress emergencies
+ * @route   PUT /api/v1/emergencies/:id/force-cancel
+ * @access  Private (Driver or Patient)
+ */
+export const forceCancelEmergency = asyncHandler(async (req, res) => {
+  const { id: emergencyId } = req.params;
+  const { reason } = req.body;
+
+  console.log(`🚫 [FORCE CANCEL] Emergency ${emergencyId} by user ${req.user.id}`);
+
+  const emergency = await Emergency.findById(emergencyId)
+    .populate('patient')
+    .populate('assignedDriver')
+    .populate('assignedHospital');
+
+  if (!emergency) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.NOT_FOUND,
+      "Emergency not found"
+    );
+  }
+
+  // Verify user is involved in this emergency
+  const isPatient = emergency.patient._id.toString() === req.user.id;
+  const isDriver = emergency.assignedDriver?._id.toString() === req.user.id;
+
+  if (!isPatient && !isDriver) {
+    return sendResponse(
+      res,
+      RESPONSE_CODES.FORBIDDEN,
+      "You are not authorized to cancel this emergency"
+    );
+  }
+
+  console.log(`✅ [FORCE CANCEL] Cancelling emergency`);
+
+  // Release reserved bed if exists
+  if (emergency.assignedHospital && emergency.reservedBedType) {
+    const bedField = `beds.${emergency.reservedBedType}.available`;
+    await Hospital.findByIdAndUpdate(
+      emergency.assignedHospital._id,
+      { $inc: { [bedField]: 1 } }
+    );
+    console.log(`✅ [FORCE CANCEL] Released ${emergency.reservedBedType} bed`);
+  }
+
+  // Update emergency status
+  emergency.status = EMERGENCY_STATUS.CANCELLED;
+  emergency.cancelledAt = new Date();
+  emergency.cancellationReason = reason || 'Emergency cancelled due to app crash or technical issue';
+  emergency.cancelledBy = req.user.id;
+  emergency.forceCancelled = true;
+  
+  await emergency.save();
+
+  // Notify both patient and driver
+  try {
+    if (emergency.patient) {
+      emitToUser(emergency.patient._id.toString(), "emergency:cancelled", {
+        emergencyId: emergency._id,
+        reason: emergency.cancellationReason,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    if (emergency.assignedDriver) {
+      emitToUser(emergency.assignedDriver._id.toString(), "emergency:cancelled", {
+        emergencyId: emergency._id,
+        reason: emergency.cancellationReason,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  } catch (error) {
+    console.error("⚠️ Failed to send notifications:", error.message);
+  }
+
+  console.log(`✅ [FORCE CANCEL] Emergency ${emergencyId} cancelled successfully`);
+
+  sendResponse(
+    res,
+    RESPONSE_CODES.SUCCESS,
+    "Emergency cancelled successfully",
+    { emergency }
+  );
 });
 

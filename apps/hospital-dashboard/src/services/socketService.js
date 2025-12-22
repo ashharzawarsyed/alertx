@@ -11,11 +11,13 @@ class SocketService {
 
   connect(hospitalId, token) {
     if (this.socket?.connected) {
-      console.log("Socket already connected");
+      console.log("✅ [SOCKET] Already connected");
       return this.socket;
     }
 
-    console.log("Connecting to Socket.IO server:", SOCKET_URL);
+    console.log("📡 [SOCKET] Connecting to Socket.IO server:", SOCKET_URL);
+    console.log("📡 [SOCKET] Hospital ID:", hospitalId);
+    console.log("📡 [SOCKET] Token present:", !!token);
 
     this.socket = io(SOCKET_URL, {
       auth: {
@@ -38,29 +40,45 @@ class SocketService {
     if (!this.socket) return;
 
     this.socket.on("connect", () => {
-      console.log("✅ Socket.IO connected:", this.socket.id);
+      console.log("✅ [SOCKET] Connected successfully!");
+      console.log("📡 [SOCKET] Socket ID:", this.socket.id);
+      console.log("📡 [SOCKET] Transport:", this.socket.io.engine.transport.name);
       this.isConnected = true;
     });
 
     this.socket.on("disconnect", (reason) => {
-      console.log("❌ Socket.IO disconnected:", reason);
+      console.log("❌ [SOCKET] Disconnected:", reason);
       this.isConnected = false;
     });
 
     this.socket.on("connect_error", (error) => {
-      console.error("Socket.IO connection error:", error.message);
+      console.error("❌ [SOCKET] Connection error:", error.message);
+      console.error("❌ [SOCKET] Error details:", error);
     });
 
     this.socket.on("error", (error) => {
-      console.error("Socket.IO error:", error);
+      console.error("❌ [SOCKET] Socket error:", error);
+    });
+
+    // Listen for hospital join confirmation
+    this.socket.on("hospital:joined", (data) => {
+      console.log("✅ [SOCKET] Hospital room joined:", data);
     });
   }
 
   // Bed update events
   onBedUpdate(callback) {
     if (!this.socket) return;
-    this.socket.on("bed:updated", callback);
-    this.listeners.set("bed:updated", callback);
+    
+    console.log("📡 [SOCKET] Registering listener: bed:updated");
+    
+    const wrappedCallback = (data) => {
+      console.log("🛏️ [EVENT] bed:updated received:", data);
+      callback(data);
+    };
+    
+    this.socket.on("bed:updated", wrappedCallback);
+    this.listeners.set("bed:updated", wrappedCallback);
   }
 
   onBedStatusChange(callback) {
@@ -76,6 +94,20 @@ class SocketService {
     this.listeners.set("emergency:new", callback);
   }
 
+  onEmergencyIncoming(callback) {
+    if (!this.socket) return;
+    
+    console.log("📡 [SOCKET] Registering listener: emergency:incoming");
+    
+    const wrappedCallback = (data) => {
+      console.log("🚨 [EVENT] emergency:incoming received:", data);
+      callback(data);
+    };
+    
+    this.socket.on("emergency:incoming", wrappedCallback);
+    this.listeners.set("emergency:incoming", wrappedCallback);
+  }
+
   onEmergencyUpdate(callback) {
     if (!this.socket) return;
     this.socket.on("emergency:updated", callback);
@@ -86,6 +118,12 @@ class SocketService {
     if (!this.socket) return;
     this.socket.on("emergency:assigned", callback);
     this.listeners.set("emergency:assigned", callback);
+  }
+
+  onEmergencyCompleted(callback) {
+    if (!this.socket) return;
+    this.socket.on("emergency:completed", callback);
+    this.listeners.set("emergency:completed", callback);
   }
 
   // Patient events
@@ -129,11 +167,13 @@ class SocketService {
   // Join hospital room for targeted events
   joinHospitalRoom(hospitalId) {
     if (!this.socket?.connected) {
-      console.warn("Socket not connected, cannot join hospital room");
+      console.warn("⚠️ [SOCKET] Socket not connected, cannot join hospital room");
       return;
     }
+    
+    console.log(`📡 [SOCKET] Joining hospital room: hospital:${hospitalId}`);
     this.socket.emit("hospital:join", hospitalId);
-    console.log(`Joined hospital room: ${hospitalId}`);
+    console.log(`✅ [SOCKET] Emitted hospital:join event for: ${hospitalId}`);
   }
 
   // Remove all listeners

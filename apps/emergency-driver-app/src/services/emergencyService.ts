@@ -304,6 +304,94 @@ class EmergencyService {
   async completeEmergency(emergencyId: string): Promise<EmergencyResponse> {
     return this.updateEmergencyStatus(emergencyId, 'completed');
   }
+
+  /**
+   * Get driver's active emergency (for recovery after app restart)
+   */
+  async getActiveEmergency(): Promise<Emergency | null> {
+    try {
+      console.log('🔍 Fetching active emergency for driver...');
+
+      const response = await this.api.get<{ success: boolean; data: { activeEmergency: Emergency | null } }>(
+        '/emergencies/driver/active'
+      );
+
+      if (response.data.success && response.data.data.activeEmergency) {
+        console.log('✅ Found active emergency:', response.data.data.activeEmergency._id);
+        return response.data.data.activeEmergency;
+      }
+
+      console.log('✅ No active emergency found');
+      return null;
+    } catch (error: any) {
+      console.error('❌ Get active emergency error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Force complete emergency (for stuck emergencies due to app crash)
+   */
+  async forceCompleteEmergency(
+    emergencyId: string,
+    reason?: string
+  ): Promise<EmergencyResponse> {
+    try {
+      console.log('⚠️ Force completing emergency:', emergencyId);
+
+      const response = await this.api.put<EmergencyResponse>(
+        `/emergencies/${emergencyId}/force-complete`,
+        { reason: reason || 'Emergency force completed due to technical issue' }
+      );
+
+      console.log('✅ Emergency force completed');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Force complete error:', error);
+
+      if (error.response?.data) {
+        return error.response.data;
+      }
+
+      return {
+        success: false,
+        message: error.message || 'Failed to force complete emergency',
+        errors: [error.message || 'Network error'],
+      };
+    }
+  }
+
+  /**
+   * Force cancel emergency (for in-progress emergencies that are stuck)
+   */
+  async forceCancelEmergency(
+    emergencyId: string,
+    reason?: string
+  ): Promise<EmergencyResponse> {
+    try {
+      console.log('⚠️ Force cancelling emergency:', emergencyId);
+
+      const response = await this.api.put<EmergencyResponse>(
+        `/emergencies/${emergencyId}/force-cancel`,
+        { reason: reason || 'Emergency cancelled due to technical issue' }
+      );
+
+      console.log('✅ Emergency force cancelled');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Force cancel error:', error);
+
+      if (error.response?.data) {
+        return error.response.data;
+      }
+
+      return {
+        success: false,
+        message: error.message || 'Failed to force cancel emergency',
+        errors: [error.message || 'Network error'],
+      };
+    }
+  }
 }
 
 export const emergencyService = new EmergencyService();

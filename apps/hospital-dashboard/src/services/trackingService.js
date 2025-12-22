@@ -17,6 +17,10 @@ class TrackingService {
       import.meta.env.VITE_API_URL ||
       "http://localhost:5001";
 
+    console.log("🔌 [TRACKING SERVICE] Connecting to:", socketUrl);
+    console.log("🔌 [TRACKING SERVICE] Hospital ID:", hospitalId);
+    console.log("🔌 [TRACKING SERVICE] Token exists:", !!token);
+
     this.socket = io(socketUrl, {
       auth: {
         token,
@@ -26,25 +30,33 @@ class TrackingService {
       reconnection: true,
       reconnectionAttempts: this.maxReconnectAttempts,
       reconnectionDelay: 1000,
+      transports: ["websocket", "polling"],
     });
 
     this.socket.on("connect", () => {
-      console.log("✅ Tracking socket connected");
+      console.log("✅ [TRACKING SERVICE] Socket connected!");
+      console.log("📡 [TRACKING SERVICE] Socket ID:", this.socket.id);
+      console.log("📡 [TRACKING SERVICE] Transport:", this.socket.io.engine.transport.name);
       this.reconnectAttempts = 0;
       this.socket.emit("hospital:join", hospitalId);
+      console.log("📤 [TRACKING SERVICE] Emitted hospital:join with ID:", hospitalId);
+    });
+
+    this.socket.on("hospital:joined", (data) => {
+      console.log("✅ [TRACKING SERVICE] Successfully joined hospital room:", data);
     });
 
     this.socket.on("disconnect", (reason) => {
-      console.log("❌ Tracking socket disconnected:", reason);
+      console.log("❌ [TRACKING SERVICE] Socket disconnected:", reason);
     });
 
     this.socket.on("connect_error", (error) => {
-      console.error("Socket connection error:", error);
+      console.error("❌ [TRACKING SERVICE] Connection error:", error.message);
       this.reconnectAttempts++;
     });
 
     this.socket.on("reconnect", (attemptNumber) => {
-      console.log("✅ Reconnected after", attemptNumber, "attempts");
+      console.log("✅ [TRACKING SERVICE] Reconnected after", attemptNumber, "attempts");
       // Rejoin hospital room
       this.socket.emit("hospital:join", hospitalId);
     });
